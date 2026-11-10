@@ -1,0 +1,100 @@
+html,body,div,span,applet,object,,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video {
+  box-sizing: border-box;
+	margin:0;
+	padding:0;
+	border:0;
+	font-size:100%;
+	font:inherit;
+	font-weight:normal;
+	vertical-align:baseline;
+}
+html {
+    font-family: "Helvetica Neue",Helvetica,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","微软雅黑",Arial,sans-serif;
+}
+
+img{
+  verticle-align:middle;
+}
+
+/* HTML5 display-role reset for older browsers */
+article,aside,details,figcaption,figure,footer,header,hgroup,menu,nav,section {
+	display:block;
+}
+ol,ul,li {
+	list-style:none;
+}
+blockquote,q {
+	quotes:none;
+}
+blockquote:before,blockquote:after,q:before,q:after {
+	content:'';
+	content:none;
+}
+table {
+	border-collapse:collapse;
+	border-spacing:0;
+}
+th,td {
+	vertical-align:middle;
+}
+/* custom */
+a {
+	outline:none;
+	/* 原来写死 #16418a（深海军蓝）→ 深色下等于隐形，于是提成变量。
+	   现在这个变量由 utils/themeRuntime.js 按「当前色相」派生
+	   （浅底压暗、深底提亮），所以换主题色时它也跟着变。
+	   括号里那个值是「JS 还没跑起来」时的兜底 —— 与 themes.styl 的首帧值同一档 */
+	color: var(--theme-font-link, #16418a);
+	text-decoration:none;
+	-webkit-backface-visibility:hidden;
+}
+a:focus {
+	outline:none;
+}
+input:focus,select:focus,textarea:focus {
+	outline:-webkit-focus-ring-color auto 0;
+}
+
+/* ============================================================
+   全站固定缩放 125%
+   ------------------------------------------------------------
+   全站的尺寸都是写死的 px（没有 rem），基准又是 1024px 固定宽度的布局，
+   在 1440 及以上的窗口里整体显得偏小。这里直接给 body 挂 zoom 把整个
+   页面放大 1.25 倍 —— 效果等同于「浏览器缩放设成 125%」，且是写死在页面里的，
+   不依赖用户自己的浏览器设置。
+
+   ⚠ 为什么挂 body 而不是 #app / html：
+     element-ui 的弹窗（el-dialog）用了 append-to-body，DOM 会被挪到
+     <body> 下、跑到 #app 外面去。挂在 #app 上的话，登录框 / 裁剪框 / 确认框
+     不会被放大，会和页面其它部分对不上。挂 body 才能把所有东西一起罩住。
+
+   ⚠ zoom 会把「布局视口」压成实际窗口的 1/1.25（1440 的窗口 → 布局按 1152 算），
+     而媒体查询仍然按真实 innerWidth 判断。所以任何「按像素宽度判断是否放得下」
+     的断点都得跟着 ÷1.25 之后再写 —— 目前只有 Home.vue 里那条
+     `max-width: 1024px`（固定宽度的 .el-row 改 100%），已同步改成 1280px。
+     其余断点（991 / 1200 等）都是与 Element 栅格 992 / 1200 对齐的，
+     按真实 innerWidth 判断才正确，保持不动。
+
+   ⚠ zoom 作用域内 position: fixed 的百分比仍相对「缩放后的视口」计算，
+     实测 .blog-head（fixed, left:5% / width:90%）在 1440 窗口下
+     落在 left:70 / width:1268，与不缩放时视觉一致。
+
+   配套：用户滚轮缩放会在此之上再叠一层浏览器缩放（1.25 × 1.25 = 156%），
+   已由 src/utils/lockZoom.js 拦掉。
+   ============================================================ */
+
+body {
+	zoom: 1.25;
+	min-width: 500px;
+	/* 页面底：token 一直有（--theme-bgc-main），但从没被用在画布上 ——
+	   不留这句的话深色模式下整页仍是白的（body 透明 = 浏览器默认白）。
+	   body 背景会传播到画布，所以不必再给 html 写一份 */
+	background-color: var(--theme-bgc-main);
+	/* 基础文字色：全站从没设过 —— 于是所有没被明确指定颜色的文字
+	   （页脚、以及一切不落在 el-card 里的裸文本）都停在浏览器默认的黑。
+	   深色模式下就是「黑字压深底」，整片看不清。
+	   浅色下 #333 与原来的黑肉眼无差，深色下换成 --theme-font-light(#E3E8EE)。
+	   ⚠ 卡片里的文字不靠这条 —— el-card 自带 `color:#303133`，
+     见 assets/css/element-theme.styl 里的接管 */
+	color: var(--theme-font-light);
+}

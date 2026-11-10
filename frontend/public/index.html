@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <link rel="icon" href="<%= BASE_URL %>favicon.ico">
+    <title><%= htmlWebpackPlugin.options.title %></title>
+    <!--
+      Live2D Cubism Core（WASM 运行时）—— 菲比桌宠用
+      ⚠ 必须是**全局脚本、且在打包产物之前**：
+         @jannchie/pixi-live2d-display 的 cubism4 构建在「模块加载时」就会断言
+         window.Live2DCubismCore 存在，缺了就直接抛
+         Could not find Cubism 4 runtime —— 整个 app 都挂不上（不是桌宠局部报错）。
+         放在 head 里天然早于 vue-cli 注入到 body 末尾的业务脚本。
+      ⚠ 版本用官方 v5（moc3 是 v3，v5 Core 向下兼容），与 SKILL 的版本组合一致。
+    -->
+    <script src="<%= BASE_URL %>lib/live2dcubismcore.min.js"></script>
+  </head>
+  <body>
+    <noscript>
+      <strong>We're sorry but <%= htmlWebpackPlugin.options.title %> doesn't work properly without JavaScript enabled. Please enable it to continue.</strong>
+    </noscript>
+    <div id="app"></div>
+    <!-- built files will be auto injected -->
+  </body>
+</html>

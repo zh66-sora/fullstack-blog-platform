@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# logs
+*.log
+
+# secrets（RSA 密钥，首次运行自动生成）
+backend/auth/
+
+# user-uploaded data
+backend/uploads/
+
+# editor / agent
+.idea/
+.vscode/
+.claude/
+
+# os
+.DS_Store
+Thumbs.db
+
+# Live2D 桌宠模型（二进制资源，约 24MB，不入库）
+frontend/public/models/*
+!frontend/public/models/README.md

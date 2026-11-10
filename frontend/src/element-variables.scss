@@ -1,0 +1,25 @@
+/*
+Write your variables here. All available variables can be
+found in element-ui/packages/theme-chalk/src/common/var.scss.
+For example, to overwrite the theme color:
+*/
+
+/*
+ * 主色对齐到项目自己的主题蓝（themes.styl 的 --theme-font-fst: #68AEF4）。
+ *
+ * ⚠ 原来这里是洋红 rgb(172, 63, 137) —— 而 plugins/element.js 里同时还引入了
+ *   element 自带的 theme-chalk/index.css（默认蓝 #409EFF）。
+ *   两套主题一起注入，实测页面上生效的是洋红那套（332 条规则），
+ *   于是 el-input 聚焦边框、el-select 选中项这些地方全是洋红，
+ *   跟页面里到处用的主题蓝完全是两套配色。
+ *   改成主题蓝之后两套颜色一致，冲突也就不再显形。
+ *
+ * 下面 element 会用 mix() 从这个值派生出 light-1..9 / dark-2 等一整组色阶，
+ * 所以只改这一行就够了，不用逐个覆盖。
+ */
+$--color-primary: #68AEF4;
+
+/* icon font path, required */
+$--font-path: '~element-ui/lib/theme-chalk/fonts';
+
+@import "~element-ui/packages/theme-chalk/src/index";

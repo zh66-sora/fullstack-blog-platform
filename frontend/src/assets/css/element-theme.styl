@@ -1,0 +1,180 @@
+// ============================================================
+// Element UI 适配层 —— 把 Element 自带的默认色接进主题变量
+// ------------------------------------------------------------
+// 为什么需要这一层：
+//   element-ui 2.x 的主题色不是 CSS 变量，而是 SCSS 的编译期常量，
+//   已经烘进 theme-chalk 的静态值里。项目从头到尾没有覆盖过它，
+//   于是留下两类「不跟主题走」的地方：
+//
+//   ① 主色 #409EFF —— Element 自己的蓝。
+//      它和 --theme-font-fst(#68AEF4) 不是一个蓝，更不会跟着调色盘变。
+//      受影响最重的是**桌宠配置选单**（满屏 el-switch / el-radio-button），
+//      以及所有输入框的聚焦描边。
+//
+//   ② 写死的中性色 —— 最典型的是 `.el-card{color:#303133}`：
+//      el-card 是本项目卡片外壳的基底（14 处），它把卡片里**所有**文字
+//      钉死在深灰 #303133。深色模式下卡片底变成 #1E232A，文字还是 #303133，
+//      对比度只有 1.2 —— 这就是「大片文字没变白、看不清」的总根源
+//      （实测：深色下首页 55 个低对比元素里 40+ 个都是它）。
+//      .el-dialog / .el-input__inner / 表单标签同理。
+//
+// 层级策略：
+//   本文件的选择器与 element 自带的**同权重**，靠「注入顺序」拿下级联。
+//   main.js 里它被夹在中间：plugins/element.js 之后（压过 Element）、
+//   项目自有样式之前（同权重时让项目自己的写法优先）。
+//   ⚠ main.js 里这行的位置不能挪到 plugins/element.js 前面，
+//     否则会被 element 反压回去，本文件整片失效。
+//   项目里那些两级选择器（.el-button.blog-btn--submit）权重更高，
+//   不受这一层影响；这里只负责把 Element 的默认值扶到主题上。
+//
+// 补充：项目另有 element-variables.scss，用 SCSS 把 $--color-primary 编译成
+//   #68AEF4 —— 但那是**编译期常量**，切主题色时不会变（这正是
+//   「桌宠选单里的控件换色相后还是蓝的」的原因）。
+//   SCSS 变量喂不了运行时 CSS 变量，所以只能在这一层用 CSS 覆盖。
+// ============================================================
+@import './themes.styl'
+
+// ---------- ① 主色：Element 蓝 → 主题强调色 ----------
+
+// 开关（桌宠选单、「菲比桌宠」启停、其它形象的出现/消失）
+.el-switch.is-checked .el-switch__core
+  border-color: var(--theme-font-fst)
+  background-color: var(--theme-font-fst)
+
+.el-switch__label
+  color: var(--theme-font-trd)
+
+.el-switch__label.is-active
+  color: var(--theme-font-fst)
+
+// 单选按钮组（桌宠选单的「大小 / 表情」）
+.el-radio-button__inner
+  background-color: var(--theme-bgc-card)
+  border-color: var(--theme-border)
+  color: var(--theme-font-light)
+
+.el-radio-button__inner:hover
+  color: var(--theme-font-fst)
+
+.el-radio-button__orig-radio:checked + .el-radio-button__inner
+  color: #fff
+  background-color: var(--theme-font-fst)
+  border-color: var(--theme-font-fst)
+  // element 靠这条 -1px 的阴影盖掉「相邻两个按钮叠在一起的双边框」，
+  // 颜色必须跟着主色换 —— 否则选中块左边会留一道蓝线
+  box-shadow: -1px 0 0 0 var(--theme-font-fst)
+
+.el-radio__input.is-checked .el-radio__inner
+  border-color: var(--theme-font-fst)
+  background-color: var(--theme-font-fst)
+
+.el-radio__input.is-checked + .el-radio__label
+  color: var(--theme-font-fst)
+
+.el-radio__label
+  color: var(--theme-font-light)
+
+// 输入框 / 文本域的聚焦描边
+.el-input__inner:focus,
+.el-input.is-active .el-input__inner,
+.el-textarea__inner:focus
+  border-color: var(--theme-font-fst)
+
+.el-form-item__label
+  color: var(--theme-font-light)
+
+.el-form-item__error
+  color: var(--theme-font-danger)
+
+// 上传（拖拽区）
+.el-upload-dragger
+  border-color: var(--theme-border)
+  background-color: var(--theme-bgc-card)
+  color: var(--theme-font-light)
+
+.el-upload-dragger:hover,
+.el-upload-dragger.is-dragover
+  border-color: var(--theme-font-fst)
+
+.el-upload__tip
+  color: var(--theme-font-trd)
+
+// 弹窗右上角关闭按钮的 hover
+.el-dialog__headerbtn:focus .el-dialog__close,
+.el-dialog__headerbtn:hover .el-dialog__close
+  color: var(--theme-font-fst)
+
+// ---------- ② 写死的中性色 → 主题中性变量 ----------
+
+// 卡片：本项目所有卡片的壳。
+// ⚠ color 这一条是本次「深色模式大片看不清」的最大单点，别删
+.el-card
+  color: var(--theme-font-light)
+  background-color: var(--theme-bgc-card)
+  border-color: var(--theme-border)
+
+.el-card__header
+  border-bottom-color: var(--theme-border-light)
+
+// 弹窗（登录/注册 / 裁剪 / 确认 / 评论楼中楼）
+.el-dialog
+  background-color: var(--theme-bgc-card)
+
+.el-dialog__title
+  color: var(--theme-font-light)
+
+.el-dialog__body
+  color: var(--theme-font-light)
+
+.el-dialog__headerbtn .el-dialog__close
+  color: var(--theme-font-trd)
+
+// 输入框：底色与描边项目里各有更具体的规定（form.styl / modal.styl / Head.vue），
+// 这里只兜住它们没覆盖到的（例如页头搜索框）以及文字色本身
+.el-input__inner,
+.el-textarea__inner
+  color: var(--theme-font-light)
+  background-color: var(--theme-bgc-input-edit)
+  border-color: var(--theme-border)
+
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder
+  color: var(--theme-font-placeholder)
+
+.el-input__inner:hover,
+.el-textarea__inner:hover
+  border-color: var(--theme-border)
+
+// 字数统计（show-word-limit）：element 默认给它一块白底，
+// 深色下会变成骑在深色输入框上的一块白斑
+.el-input .el-input__count
+  background-color: transparent
+  color: var(--theme-font-trd)
+
+.el-textarea .el-input__count
+  background-color: transparent
+  color: var(--theme-font-trd)
+
+// 图片加载失败的兜底块
+.el-image__error
+  background-color: var(--theme-bgc-chip)
+  color: var(--theme-font-trd)
+
+// ---------- ③ 全局提示（$toast） ----------
+// 项目的 $toast（utils/message.js）用的是 element 的 Notification ——
+// 它默认是一块白底浮层：深色模式下会突兀地亮一整块，文字也还是 #303133。
+.el-notification
+  border-color: var(--theme-border)
+  background-color: var(--theme-bgc-card)
+
+.el-notification__title
+  color: var(--theme-font-light)
+
+.el-notification__content
+  color: var(--theme-font-trd)
+
+.el-notification__closeBtn
+  color: var(--theme-font-trd)
+
+  &:hover
+    color: var(--theme-font-light)

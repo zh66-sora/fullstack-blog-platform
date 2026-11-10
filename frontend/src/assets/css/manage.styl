@@ -1,0 +1,188 @@
+@import 'themes.styl'
+
+// ============================================================
+// 博客管理页样式（views/Manage.vue + components/manage/ManageItem.vue）
+//
+// ⚠ 只写「管理页独有的那几块」：卡片壳的顶栏/内边距、胶囊条目、展开行。
+//   顶栏直接复用 assets/css/form.styl 的 `.blog-write--header` / `.blog-write--back`
+//   —— 那是全局共享的「卡片顶栏」（写博客页 / 个人中心都在用，与本页要的一模一样）。
+//   ⚠ 名字里带 write 是历史原因，别因为名字不合意再抄第三份
+//     （Column.vue 已经抄过一份 `.blog-column--header`，那份是重复的）。
+//
+// ⚠ 圆角 / 间距 / 字号一律走 themes.styl 的 token；颜色一律走 CSS 变量。
+//
+// ⚠ 声明统一写「属性: 值」带冒号形式 —— Stylus 对「无冒号 + 值是多段」有歧义，
+//   紧跟缩进更深的嵌套块时会被当成选择器解析、整条静默丢失（详见 component.styl）。
+// ============================================================
+
+// ===== 卡片壳：顶栏要「贴边整条色块」=====
+// el-card 默认给 header/body 各留 24px 内边距，顶栏就贴不到卡片边缘
+// ⚠ 权重写到 4 个类：要压过 component.styl 的 `.el-card.blog-card .el-card__header`
+//   （同权重时看注入顺序，靠不住）—— 与 Column.vue 的处理完全一致
+.el-card.blog-card.blog-manage--wrap
+  .el-card__header
+    padding: 0
+  .el-card__body
+    padding: 0
+
+#manage
+  // 与 #index / #column 同款：不锁高（整页滚动），只留底部空白
+  margin-bottom: $theme-spacing['2xl']
+
+// ===== 列表 =====
+.blog-manage--list
+  display: flex
+  flex-direction: column
+  gap: $theme-spacing.base
+  padding: $theme-spacing.xl
+
+// 分页器：与列表之间留出间距（它挂在 ul 外面）
+.blog-manage--pager
+  padding: 0 $theme-spacing.xl $theme-spacing.xl
+
+// ============================================================
+// 一条博客：胶囊 + 展开行
+//
+// 结构：
+//   li.blog-manage--item          条目本体（淡主题底）
+//     div.blog-manage--row        第一行：板块圆圈 / 标题 / 三个按钮
+//     transition → .blog-manage--meta        展开动画的「壳」（**不能有 padding**）
+//                    .blog-manage--meta_inner 真正的小字行（padding / 排版都在这层）
+//
+// 圆角：收起与展开都是 16px —— 需求就是「单条 item 改为 16px 圆角」。
+// （原来是「收起 999px 胶囊 / 展开 16px」，那需要额外过渡一次 border-radius；
+//  现在两态同值，那条过渡也一起删了 —— 大元素上白跑一次重绘。）
+// ============================================================
+.blog-manage--item
+  border-radius: $theme-radius.lg
+  // 淡背景走「浅色按钮底」这一档：浅色下是带主题色的极浅底、深色下是比卡片略亮的暗块 ——
+  // 昼夜切换与调色盘换色相都会跟着变（需求：背景为当前主题色衍生出的淡背景色）
+  background-color: var(--theme-bgc-lightBtn)
+  transition: background-color 0.2s ease
+
+  &:hover
+    background-color: var(--theme-bgc-deepBtn)
+
+.blog-manage--row
+  display: flex
+  align-items: center
+  gap: $theme-spacing.base
+  padding: $theme-spacing.sm $theme-spacing.base
+
+// 左侧白色圆圈：里面是所属板块的 iconfont
+// ⚠ 底色不能写死 #fff：深色模式下那会是一块白斑。
+//   走 --theme-bgc-card —— 浅色下就是白（视觉零变化），深色下是比胶囊更暗的一档。
+//   这与 Column 页返回键的处理是同一个理由。
+.blog-manage--badge
+  display: flex
+  align-items: center
+  justify-content: center
+  flex: 0 0 auto
+  width: 36px
+  height: 36px
+  border-radius: 50%
+  background-color: var(--theme-bgc-card)
+  color: var(--theme-font-fst)
+
+  i
+    font-size: 18px
+    line-height: 1
+
+// 标题：占满中间，超长省略
+.blog-manage--title
+  flex: 1
+  min-width: 0
+  overflow: hidden
+  text-overflow: ellipsis
+  white-space: nowrap
+  text-align: left
+  color: var(--theme-font-light)
+  font-size: $theme-fz.base
+  font-weight: 700
+
+.blog-manage--actions
+  display: flex
+  align-items: center
+  flex: 0 0 auto
+  gap: $theme-spacing.xs
+
+.blog-manage--btn
+  display: flex
+  align-items: center
+  justify-content: center
+  width: 32px
+  height: 32px
+  padding: 0
+  border: none
+  border-radius: 50%
+  background-color: transparent
+  color: var(--theme-font-trd)
+  cursor: pointer
+  transition: background-color 0.2s ease, color 0.2s ease
+
+  i
+    font-size: 16px
+    line-height: 1
+
+  &:hover
+    background-color: var(--theme-bgc-card)
+    color: var(--theme-font-fst)
+
+// 删除钮：悬停转警示色，与「赞/评论」那种中性操作区分开
+.blog-manage--btn_danger
+  &:hover
+    color: var(--theme-font-danger)
+
+// 「展开」箭头：收起时朝下、展开时朝上（rotate 180°）
+// 转场写法与搜索面板的漏斗图标一致（transition: transform 0.3s）
+.blog-manage--caret
+  display: block
+  transform: rotate(180deg)
+  transition: transform 0.3s ease
+
+  .is-open &
+    transform: rotate(0deg)
+
+// ===== 展开行：只读小字（需求：这里的信息不可操作）=====
+// 外层是「给 el-collapse-transition 量高度的壳」——
+// ⚠ 它**必须没有 padding / border**：el-collapse-transition 是在 padding 归零之后量
+//   scrollHeight、再把 height 设成那个数，而全局是 box-sizing: border-box，
+//   壳上只要有 padding，动画就会停在「内容高」、最后一帧再跳到「内容 + padding」
+//   （实测跳 20 屏幕像素，就是那个「最后阶段的卡顿感」）。
+//   加 padding 请加到 .blog-manage--meta_inner 上。
+.blog-manage--meta
+  display: block
+
+// 真正的小字行：排版与内边距都在这一层
+// ⚠ 左侧 60px 让过上面的圆圈（36px + 12px 间距 + 12px 左内边距），与标题左对齐
+.blog-manage--meta_inner
+  display: flex
+  flex-wrap: wrap
+  align-items: center
+  gap: $theme-spacing.base $theme-spacing.xl
+  padding: $theme-spacing.xs $theme-spacing.base $theme-spacing.base 60px
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+
+.blog-manage--meta_item
+  display: inline-flex
+  align-items: center
+  gap: $theme-spacing.xs
+  // 纯展示：不要手型、不要 hover 反馈、不可选中
+  cursor: default
+  user-select: none
+
+  i
+    font-size: 14px
+    line-height: 1
+
+// ===== 响应式：xs（< 768px）=====
+// 展开行的小字在窄屏会挤成两三行；把左内边距收掉、间距压一档
+// ⚠ 改的是 _inner（带 padding 的那层），不是外壳 —— 理由见上面那段
+@media only screen and (max-width: 767px)
+  .blog-manage--list
+    padding: $theme-spacing.base
+
+  .blog-manage--meta_inner
+    padding-left: $theme-spacing.base
+    gap: $theme-spacing.sm $theme-spacing.base

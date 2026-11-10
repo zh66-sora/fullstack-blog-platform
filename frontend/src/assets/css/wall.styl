@@ -1,0 +1,210 @@
+@import 'themes.styl'
+
+// ============================================================
+// 留言墙样式（views/Message.vue + components/wall/*）
+//
+// ⚠ 只写「留言墙独有的那几块」：输入卡、列表卡、字数计数、板主标记。
+//   留言条目（头像 / 昵称 / 正文 / 时间 / 回复列表）一律复用评论区的
+//   .blog-comment--* 类 —— 同一套类在两个模块里共用，才是「抽公共样式」；
+//   把那些类抄一份过来，改的时候就要改两处。
+//
+// ⚠ 所有声明统一写成「属性: 值」的带冒号形式（原因见 component.styl 顶部说明）。
+// ============================================================
+
+// ⚠⚠ 页面根节点（.blog-wall，views/Message.vue 的根元素）**不要写 margin-top**。
+//   留言页的正文首卡必须和侧栏首卡齐平，这是全站口径：
+//   .blog-middle-main 已经用 translateY(-50px) 与横幅重叠（Home.vue 里那条），
+//   各页第一个卡片因此自然落在同一个高度（文章列表页实测差值为 0）。
+//   这里原来有一条 `margin-top: $theme-spacing.lg`（24px）：
+//   .blog-middle-main 的 padding 是 0，这个上边距会**穿透**（外边距合并）把整列压低 ——
+//   表现就是「大屏下留言输入框比侧栏低一截」。zoom:1.25 下量出来是 30px。
+//   实测：就地把它改成 0，差值立刻从 −30 回到 0。
+//   ⇒ 要在页面顶部加间距的话，加在「卡片之间」，别加在页面根上。
+//   （所以这里不再有 .blog-wall 规则本身 —— 它现在什么也不用声明。）
+
+// 列表卡：与输入卡之间留一点距离（输入卡自带 margin-bottom）
+.blog-wall--card
+  margin-top: $theme-spacing.base
+
+// ===== 输入卡底部左侧：提示 / 正在回复 =====
+.blog-wall--input_tools
+  display: flex
+  align-items: center
+  min-width: 0
+
+.blog-wall--tip
+  font-size: $theme-fz.sm
+  color: var(--theme-font-trd)
+
+.blog-wall--replying
+  display: flex
+  align-items: center
+  gap: $theme-spacing.xs
+  font-size: $theme-fz.sm
+  color: var(--theme-font-trd)
+
+  b
+    color: var(--theme-font-fst)
+
+.blog-wall--cancel
+  padding: 0
+  border: none
+  background: transparent
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+
+  &:hover
+    color: var(--theme-font-fst)
+
+// ===== 输入卡底部右侧：字数 + 提交 =====
+.blog-wall--submit_group
+  display: flex
+  align-items: center
+  gap: $theme-spacing.base
+  margin-left: auto
+
+.blog-wall--counter
+  font-size: $theme-fz.sm
+  color: var(--theme-font-trd)
+  // 数字等宽，跳到两位数时按钮不会跟着抖
+  font-variant-numeric: tabular-nums
+
+  // 超限：转成警示色（与校验失败那一档一致）
+  &.is-over
+    color: var(--theme-font-danger)
+
+// ===== 板主标记 =====
+.blog-wall--badge
+  display: inline-block
+  padding: 0 $theme-spacing.xs
+  border-radius: $theme-radius.xxs
+  background-color: var(--theme-bgc-lightBtn)
+  color: var(--theme-font-fst)
+  font-size: $theme-fz.sm
+  line-height: 1.6
+
+// ============================================================
+// 弹幕留言墙（components/wall/WallDanmaku.vue —— 侧栏扩展功能下面那张卡）
+//
+// 结构：
+//   .blog-danmaku              视口（overflow: hidden）+ 五条轨道的栅格
+//     .blog-danmaku--track     一条轨道（相对定位 = 弹幕的跑道，也是裁剪框）
+//       .blog-danmaku--item    一条弹幕：圆形头像 + 气泡（绝对定位，靠动画横穿轨道）
+//     .blog-danmaku--empty     空态（叠在轨道上方，轨道高度还在，卡片不会跳）
+//
+// ⚠ 尺寸都是按「侧栏 280px 宽的卡片」定的：轨道 26px / 头像 22px / 字号 14px。
+//   卡片在 ≤991 下沉时只会变宽（整视口），不会变窄，所以不必再写一套响应式。
+// ============================================================
+
+// ===== 头部：标题 + 右侧入口提示 =====
+.blog-danmaku--header
+  display: flex
+  align-items: baseline
+  justify-content: space-between
+
+.blog-danmaku--entry
+  flex: 0 0 auto
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+
+  i
+    margin-left: 2px
+
+// ===== 视口 =====
+.blog-danmaku
+  position: relative
+  display: grid
+  grid-template-columns: minmax(0, 1fr)
+  gap: 6px
+  // 弹幕的起点在轨道右外侧、终点在左外侧，
+  // 不裁的话会横向撑破卡片、把整页顶出横向滚动条
+  overflow: hidden
+  // 整张卡片可点（跳留言板），这里是最主要的可点区域
+  cursor: pointer
+
+// ===== 轨道 =====
+.blog-danmaku--track
+  position: relative
+  height: 26px
+  // 上下也裁：气泡贴边飞，不裁会串到隔壁轨道上
+  overflow: hidden
+
+// ===== 单条弹幕 =====
+.blog-danmaku--item
+  position: absolute
+  top: 0
+  height: 100%
+  // 起点：轨道右外侧（轨道是 overflow: hidden，此刻整条被裁掉，看不见）
+  left: 100%
+  display: flex
+  align-items: center
+  gap: 6px
+  // 气泡再长也不超出轨道宽 —— 动画终点是「左移 100%」（按轨道宽算），
+  // 弹幕比轨道还宽的话，飞到最后一刻会比轨道晚出画面
+  max-width: 100%
+  white-space: nowrap
+  animation-name: blog-danmaku-fly
+  animation-timing-function: linear
+  animation-fill-mode: forwards
+  // animation-duration 由组件按「每条随机」给（见 WallDanmaku.launch）
+
+// 头像：圆形，与气泡同高
+.blog-danmaku--avatar
+  flex: 0 0 auto
+  width: 22px
+  height: 22px
+  border-radius: 50%
+  overflow: hidden
+  background-color: var(--theme-bgc-chip)
+
+  img
+    display: block
+    width: 100%
+    height: 100%
+    object-fit: cover
+
+// 气泡
+// 底色走「链接卡底」这一档：浅色下是带一点主题色的极浅底、深色下是比卡片略亮的暗底 ——
+// 昼夜切换与调色盘换色相都会跟着变（需求：背景颜色受白天/黑夜主题影响）
+// ⚠ 气泡里只有留言正文，**没有留言者的名字**（需求：「不要留言用户的名字」）——
+//   所以这里不再有「昵称用主强调色」那条规则，作者信息只靠左边的头像表达
+.blog-danmaku--bubble
+  min-width: 0
+  padding: 1px 8px
+  border-radius: 10px
+  background-color: var(--theme-bgc-linkCard)
+  color: var(--theme-font-light)
+  font-size: $theme-fz.sm
+  line-height: 20px
+  // 最长 30 字的留言在 280px 的卡片里装不下，超出部分省略号截断
+  overflow: hidden
+  text-overflow: ellipsis
+  // ⚠ 必须显式靠左：侧栏 #aside 是 text-align: center，会一路继承到气泡里 ——
+  //   文字居中 + overflow: hidden 时，text-overflow: ellipsis 会两边一起裁，
+  //   看着像「从中间断了」，而不是末尾省略号
+  text-align: left
+
+// ===== 空态 =====
+.blog-danmaku--empty
+  position: absolute
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+  display: flex
+  align-items: center
+  justify-content: center
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+
+// ===== 动画：从轨道右外侧横穿到左外侧 =====
+// ⚠ 动的是 left 而不是 transform：translateX 的百分比是相对**元素自身宽度**的，
+//   而「飞完整条轨道」需要的位移是「自身宽度 + 轨道宽度」—— 后者只有 CSS 拿不到
+//   （得靠 JS 量、还要监听 resize 才准）。left 的百分比正好相对**轨道宽**，
+//   卡片变宽（≤991 下沉成整宽）时自动跟着走，不用重算。
+//   代价是逐帧布局，但同屏最多五条，可以忽略。
+@keyframes blog-danmaku-fly
+  from
+    left: 100%
+  to
+    left: -100%

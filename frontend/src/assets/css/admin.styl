@@ -1,0 +1,541 @@
+@import 'themes.styl'
+
+// ============================================================
+// 管理端样式（views/AdminPunish.vue / AdminAccount.vue / AdminLogs.vue）
+//
+// 复用：卡片壳 `.blog-write--editor`（form.styl 归零了 header/body 内边距）、
+//       顶栏 `.blog-write--header` / `.blog-write--back`。
+// 本文件负责三页共用的四块：工具栏控件（含自绘下拉 BlogSelect）/ 账号行 /
+//       行内处罚面板 / 操作记录表。
+//
+// 视觉口径（与站内其他页对齐）：
+//   · 面：卡片底 var(--theme-bgc-card)，页面底淡色，工具栏用 accent-mid 薄薄一层
+//   · 线：统一 1px var(--theme-border)，hover 才换成 accent
+//   · 形：工具控件与按钮走胶囊（999px），内容块走 $theme-radius.md
+//   · 色：强调色一律 var(--theme-font-fst)，危险动作用低饱和红 #d9534f
+//   · 全部用 CSS 变量 → 调色盘换色相、切深色时不用再改这里
+//
+// ⚠ 声明统一写「属性: 值」带冒号形式 —— Stylus 对「无冒号 + 值是多段」有歧义，
+//   紧跟缩进更深的嵌套块时会被当成选择器解析、整条静默丢失（详见 component.styl）。
+// ============================================================
+
+// ===== 工具栏：一条胶囊控件排 =====
+.blog-admin--toolbar
+  display: flex
+  flex-wrap: wrap
+  align-items: center
+  gap: $theme-spacing.sm
+  padding: $theme-spacing.sm
+  border-radius: $theme-radius.lg
+  background-color: var(--theme-accent-mid)
+
+  // 工具栏里的按钮与胶囊控件同高，否则一排控件高低不齐
+  .blog-write--btn
+    height: 40px
+    padding: 0 $theme-spacing.lg
+    border-radius: 999px
+
+// 筛选用的下拉（操作记录页）
+.blog-admin--filter
+  min-width: 168px
+
+// 搜索框：胶囊壳 + 内嵌图标 + 无边框输入
+.blog-admin--search
+  display: flex
+  flex: 1 1 200px
+  align-items: center
+  gap: $theme-spacing.sm
+  height: 40px
+  padding: 0 $theme-spacing.base
+  border: 1px solid var(--theme-border)
+  border-radius: 999px
+  background-color: var(--theme-bgc-card)
+  transition: border-color 0.2s ease, box-shadow 0.2s ease
+
+  i
+    flex: 0 0 auto
+    color: var(--theme-font-trd)
+    font-size: 16px
+
+  input
+    flex: 1
+    min-width: 0
+    border: none
+    background-color: transparent
+    color: var(--theme-font-light)
+    font-size: $theme-fz.sm
+    outline: none
+
+    &::placeholder
+      color: var(--theme-font-placeholder)
+
+  &:focus-within
+    border-color: var(--theme-font-fst)
+    box-shadow: 0 0 0 3px var(--theme-accent-ring)
+
+// 面板里的普通输入（处罚理由 / 新密码）：方形一点，跟表单区更像
+.blog-admin--input
+  box-sizing: border-box
+  height: 38px
+  padding: 0 $theme-spacing.base
+  border: 1px solid var(--theme-border)
+  border-radius: $theme-radius.xs
+  background-color: var(--theme-bgc-card)
+  color: var(--theme-font-light)
+  font-size: $theme-fz.sm
+  outline: none
+  transition: border-color 0.2s ease, box-shadow 0.2s ease
+
+  &::placeholder
+    color: var(--theme-font-placeholder)
+
+  &:focus
+    border-color: var(--theme-font-fst)
+    box-shadow: 0 0 0 3px var(--theme-accent-ring)
+
+.blog-admin--input_reason
+  flex: 1 1 200px
+  min-width: 160px
+
+// ===== 自绘下拉（components/base/BlogSelect.vue）=====
+.blog-select
+  position: relative
+  flex: 0 0 auto
+
+.blog-select--trigger
+  display: flex
+  align-items: center
+  gap: $theme-spacing.sm
+  height: 40px
+  padding: 0 $theme-spacing.base
+  border: 1px solid var(--theme-border)
+  border-radius: 999px
+  background-color: var(--theme-bgc-card)
+  color: var(--theme-font-light)
+  font-size: $theme-fz.sm
+  white-space: nowrap
+  cursor: pointer
+  transition: border-color 0.2s ease, color 0.2s ease
+
+  &:hover
+    border-color: var(--theme-font-fst)
+    color: var(--theme-font-fst)
+
+.blog-select--label
+  &.is-placeholder
+    color: var(--theme-font-placeholder)
+
+// icon-shang 本身是向上箭头，转 180° 当「向下展开」
+.blog-select--arrow
+  color: var(--theme-font-trd)
+  font-size: 12px
+  transform: rotate(180deg)
+  transition: transform 0.25s ease, color 0.2s ease
+
+.blog-select.is-open
+  .blog-select--arrow
+    color: var(--theme-font-fst)
+    transform: rotate(0deg)
+
+.blog-select--panel
+  position: absolute
+  z-index: 30
+  top: calc(100% + 6px)
+  left: 0
+  min-width: 100%
+  max-height: 264px
+  margin: 0
+  padding: 6px
+  overflow-y: auto
+  list-style: none
+  border: 1px solid var(--theme-border)
+  border-radius: $theme-radius.md
+  background-color: var(--theme-bgc-card)
+  box-shadow: $theme-shadows.lg
+
+.blog-select--item
+  display: flex
+  align-items: center
+  justify-content: space-between
+  gap: $theme-spacing.sm
+  padding: $theme-spacing.sm $theme-spacing.base
+  border-radius: $theme-radius.xs
+  color: var(--theme-font-light)
+  font-size: $theme-fz.sm
+  white-space: nowrap
+  cursor: pointer
+  transition: background-color 0.15s ease, color 0.15s ease
+
+  &:hover
+    background-color: var(--theme-accent-mid)
+    color: var(--theme-font-fst)
+
+  &.is-active
+    color: var(--theme-font-fst)
+    font-weight: 700
+
+.blog-select--dot
+  flex: 0 0 auto
+  width: 6px
+  height: 6px
+  border-radius: 50%
+  background-color: var(--theme-font-fst)
+
+// 展开 / 收起
+.blog-select-enter-active,
+.blog-select-leave-active
+  transition: opacity 0.16s ease, transform 0.16s ease
+
+.blog-select-enter,
+.blog-select-leave-to
+  opacity: 0
+  transform: translateY(-4px)
+
+// 「共 N 个账号」这行
+.blog-admin--summary
+  display: flex
+  align-items: center
+  gap: $theme-spacing.sm
+  margin: $theme-spacing.base 0
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+
+.blog-admin--summary_role
+  padding: 2px 8px
+  border-radius: 999px
+  background-color: var(--theme-accent-mid)
+  color: var(--theme-font-fst)
+
+// ===== 账号列表 =====
+.blog-admin--list
+  display: grid
+  grid-template-columns: minmax(0, 1fr)
+  gap: $theme-spacing.sm
+
+.blog-admin--row
+  display: grid
+  grid-template-columns: minmax(0, 1fr)
+  padding: $theme-spacing.base
+  border: 1px solid var(--theme-border)
+  border-radius: $theme-radius.md
+  background-color: var(--theme-bgc-card)
+  transition: border-color 0.2s ease, box-shadow 0.2s ease
+
+  &:hover
+    border-color: var(--theme-accent-hi)
+    box-shadow: $theme-shadows.base
+
+.blog-admin--main
+  display: flex
+  align-items: center
+  gap: $theme-spacing.base
+
+.blog-admin--avatar
+  flex: 0 0 44px
+  width: 44px
+  height: 44px
+  border: 2px solid var(--theme-bgc-card)
+  border-radius: 50%
+  overflow: hidden
+  box-shadow: 0 0 0 1px var(--theme-border)
+
+.blog-admin--who
+  flex: 1
+  min-width: 0
+
+.blog-admin--name
+  display: flex
+  flex-wrap: wrap
+  align-items: baseline
+  gap: $theme-spacing.sm
+  color: var(--theme-font-fst)
+  font-size: $theme-fz.base
+  font-weight: 700
+  text-align: left
+
+.blog-admin--username
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+  font-weight: 400
+
+.blog-admin--meta
+  display: flex
+  flex-wrap: wrap
+  align-items: center
+  gap: $theme-spacing.sm
+  margin-top: 6px
+  text-align: left
+
+.blog-admin--until
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+
+.blog-admin--reason
+  margin-top: 6px
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+  text-align: left
+
+// ===== 标签（角色 / 状态）=====
+// 统一形制：小胶囊 + 12px 字 + 低饱和底；只靠色相区分语义
+.blog-admin--tag
+  padding: 2px 9px
+  border-radius: 999px
+  background-color: var(--theme-accent-mid)
+  color: var(--theme-font-fst)
+  font-size: 12px
+  line-height: 18px
+
+  &.is-role-owner
+    background-color: rgba(214, 158, 46, 0.16)
+    color: #b8860b
+
+  &.is-role-admin
+    background-color: var(--theme-accent-mid)
+    color: var(--theme-font-fst)
+
+  &.is-role-user
+    background-color: rgba(127, 127, 127, 0.12)
+    color: var(--theme-font-trd)
+
+  &.is-status-muted
+    background-color: rgba(230, 162, 60, 0.16)
+    color: #c98a1e
+
+  &.is-status-banned
+    background-color: rgba(217, 83, 79, 0.16)
+    color: #d9534f
+
+  &.is-status-deleted
+    background-color: rgba(127, 127, 127, 0.12)
+    color: var(--theme-font-trd)
+
+// ===== 行内操作按钮：胶囊幽灵按钮 =====
+.blog-admin--actions
+  display: flex
+  flex: 0 0 auto
+  flex-wrap: wrap
+  justify-content: flex-end
+  gap: $theme-spacing.sm
+
+.blog-admin--btn
+  height: 32px
+  padding: 0 $theme-spacing.base
+  border: 1px solid var(--theme-border)
+  border-radius: 999px
+  background-color: transparent
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+  white-space: nowrap
+  cursor: pointer
+  transition: all 0.2s ease
+
+  &:hover
+    border-color: var(--theme-font-fst)
+    background-color: var(--theme-accent-mid)
+    color: var(--theme-font-fst)
+
+  &.is-danger
+    border-color: rgba(217, 83, 79, 0.32)
+    color: #d9534f
+
+    &:hover
+      background-color: rgba(217, 83, 79, 0.12)
+      border-color: #d9534f
+      color: #d9534f
+
+.blog-admin--hint
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+
+// ===== 行内展开面板（处罚 / 注销 / 重置密码）=====
+.blog-admin--panel
+  display: grid
+  gap: $theme-spacing.sm
+  margin-top: $theme-spacing.base
+  padding: $theme-spacing.base
+  border-radius: $theme-radius.md
+  background-color: var(--theme-bgc-input)
+
+.blog-admin--panel_row
+  display: flex
+  flex-wrap: wrap
+  align-items: center
+  gap: $theme-spacing.sm
+
+.blog-admin--panel_label
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+
+.blog-admin--chip
+  height: 32px
+  padding: 0 $theme-spacing.base
+  border: 1px solid var(--theme-border)
+  border-radius: 999px
+  background-color: var(--theme-bgc-card)
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+  cursor: pointer
+  transition: all 0.2s ease
+
+  &:hover
+    border-color: var(--theme-font-fst)
+    color: var(--theme-font-fst)
+
+  &.is-active
+    background-color: var(--theme-font-fst)
+    border-color: var(--theme-font-fst)
+    color: #fff
+
+// 面板里的确认 / 取消：与全站 `.blog-write--btn` 一致，只把高度收一点
+.blog-admin--panel
+  .blog-write--btn
+    height: 36px
+    padding: 0 $theme-spacing.lg
+
+.blog-admin--empty
+  padding: $theme-spacing['2xl'] 0
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+  text-align: center
+
+.blog-admin--pager
+  margin-top: $theme-spacing.lg
+
+// ============================================================
+// 操作记录表
+// 之前是「时间 | 动作 | 人 → 对象 | 说明」挤成一行，靠箭头连着看，很难扫。
+// 改成四列表格：谁、做了什么、对谁、补充说明，一眼一行。
+// ⚠ 用 grid 而不是 <table>：列宽要按比例分（说明列吃掉剩余空间），
+//   表格的 auto 布局在小屏会把文字挤成竖排。
+// ============================================================
+.blog-log--table
+  border: 1px solid var(--theme-border)
+  border-radius: $theme-radius.md
+  overflow: hidden
+
+.blog-log--head
+  display: grid
+  grid-template-columns: 132px 132px 108px minmax(0, 1fr) minmax(0, 1.3fr)
+  gap: $theme-spacing.base
+  padding: $theme-spacing.sm $theme-spacing.base
+  background-color: var(--theme-accent-mid)
+  color: var(--theme-font-fst)
+  font-size: $theme-fz.sm
+  font-weight: 700
+
+.blog-log--row
+  display: grid
+  grid-template-columns: 132px 132px 108px minmax(0, 1fr) minmax(0, 1.3fr)
+  gap: $theme-spacing.base
+  align-items: center
+  padding: $theme-spacing.base
+  border-top: 1px solid var(--theme-border)
+  background-color: var(--theme-bgc-card)
+  color: var(--theme-font-light)
+  font-size: $theme-fz.sm
+  text-align: left
+  transition: background-color 0.15s ease
+
+  &:hover
+    background-color: var(--theme-bgc-input)
+
+.blog-log--time
+  color: var(--theme-font-trd)
+  font-variant-numeric: tabular-nums
+  white-space: nowrap
+
+.blog-log--actor
+  color: var(--theme-font-fst)
+  font-weight: 700
+  overflow: hidden
+  text-overflow: ellipsis
+  white-space: nowrap
+
+.blog-log--target
+  overflow: hidden
+  text-overflow: ellipsis
+  white-space: nowrap
+
+.blog-log--detail
+  color: var(--theme-font-trd)
+  word-break: break-all
+
+// 动作标签：按「改 / 删 / 封」三类上色，扫一眼就知道这行是哪种事
+.blog-log--action
+  justify-self: start
+  padding: 2px 9px
+  border-radius: 999px
+  background-color: var(--theme-accent-mid)
+  color: var(--theme-font-fst)
+  font-size: 12px
+  line-height: 18px
+  white-space: nowrap
+
+  &.is-danger
+    background-color: rgba(217, 83, 79, 0.14)
+    color: #d9534f
+
+  &.is-warn
+    background-color: rgba(230, 162, 60, 0.16)
+    color: #c98a1e
+
+  &.is-ok
+    background-color: rgba(82, 196, 26, 0.14)
+    color: #4a9c22
+
+// ≤991：表格不再按列排，改成「一段文字流」——
+//   时间 + 操作标签打头，后面跟着「操作人 / 对象 / 说明」，字段前带小标签，
+//   窗口窄时正常换行即可。之前用 grid 重排，五个字段各自占一行、行高被撑得很松，
+//   读起来比宽屏还累。
+@media only screen and (max-width: 991px)
+  .blog-log--head
+    display: none
+
+  .blog-log--row
+    display: block
+    padding: $theme-spacing.sm $theme-spacing.base
+    line-height: 1.9
+
+  .blog-log--time
+    margin-right: $theme-spacing.sm
+    color: var(--theme-font-fst)
+    font-weight: 700
+
+  .blog-log--action
+    display: inline-block
+    margin-right: $theme-spacing.sm
+
+  .blog-log--actor
+    display: inline
+    margin-right: $theme-spacing.base
+
+  .blog-log--target
+    display: inline
+    margin-right: $theme-spacing.base
+
+  .blog-log--detail
+    display: inline
+
+  // 窄屏没有列头，给三个「无标题」字段补上内联标签，否则只有值是看不懂的
+  .blog-log--actor::before
+    content: '操作人：'
+    color: var(--theme-font-trd)
+    font-weight: 400
+
+  .blog-log--target::before
+    content: '对象：'
+    color: var(--theme-font-trd)
+
+  .blog-log--detail::before
+    content: '说明：'
+    color: var(--theme-font-trd)
+
+// ≤767：账号行改成「信息一行、按钮一行」
+@media only screen and (max-width: 767px)
+  .blog-admin--main
+    flex-wrap: wrap
+
+  .blog-admin--actions
+    flex: 1 1 100%
+    justify-content: flex-start

@@ -1,0 +1,173 @@
+@import 'themes.styl'
+
+// ============================================================
+// markdown 正文排版（.markdown-body 里的富文本）
+//
+// 后端存的文章正文是富文本 HTML，而 global.styl 的 meyer reset 把原生样式都清掉了：
+//   `font: inherit`      → h1~h6 失去字号与字重、code/pre 失去等宽字体、strong/em 被抹平
+//   `margin/padding: 0`  → 段落、标题、列表、引用之间全都没有间距
+//   `ol,ul,li { list-style: none }` → 列表连圆点都没有
+// 不补这一层的话，正文会退化成一整块同样大小的纯文本（标题和正文一样大、
+// 代码块没有等宽字体和底色、列表没有标记）。
+//
+// 只在 .markdown-body 作用域内生效，颜色全部走主题变量，跟着调色盘一起变。
+//
+// ⚠ 本文件所有声明统一写成「属性: 值」的带冒号形式 —— Stylus 对
+//   「无冒号 + 值是多段」的声明有歧义，紧跟缩进更深的嵌套块时会被当成
+//   选择器解析、整条静默丢失（详见 component.styl 顶部说明）。
+// ============================================================
+
+// 等宽字体栈（reset 把 code/pre 的默认等宽字体也清掉了）
+$font-mono = Menlo, Consolas, 'Courier New', monospace
+
+.markdown-body
+  // 与上方内容用虚线分隔（迁移自原项目 article.styl 的 .markdown-body）
+  // 用「强描边」档：1px 虚线显色本来就比实线浅一档
+  border-top: 1px dashed var(--theme-border-strong)
+  padding-top: $theme-spacing.lg
+  font-size: $theme-fz.base
+  line-height: 1.75
+  color: var(--theme-font-light)
+  text-align: left
+  // 长英文单词 / URL 不撑破卡片
+  overflow-wrap: break-word
+
+  > *:last-child
+    margin-bottom: 0
+
+  // ===== 标题 =====
+  h1, h2, h3, h4, h5, h6
+    margin: 1.5em 0 0.6em
+    font-weight: 700
+    line-height: 1.4
+    color: var(--theme-font-light)
+
+    // 正文的第一个元素就是标题时，不需要额外的上边距
+    // （上方已经有 border-top + padding-top 的留白）
+    &:first-child
+      margin-top: 0
+
+  h1
+    font-size: $theme-fz.xl
+    padding-bottom: 0.3em
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06)
+
+  h2
+    font-size: $theme-fz.lg
+    padding-bottom: 0.3em
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06)
+
+  h3
+    font-size: 1.125em
+
+  h4, h5, h6
+    font-size: 1em
+
+  // ===== 段落 =====
+  p
+    margin: 0 0 1em
+
+  // ===== 行内代码 =====
+  code
+    font-family: $font-mono
+    font-size: 0.875em
+    padding: 0.15em 0.4em
+    border-radius: $theme-radius.xs
+    background-color: var(--theme-bgc-linkCard)
+
+  // ===== 代码块 =====
+  pre
+    margin: 0 0 1.2em
+    padding: $theme-spacing.base $theme-spacing.lg
+    border-radius: $theme-radius.md
+    background-color: var(--theme-bgc-linkCard)
+    // 代码行太长时横向滚动，不撑破卡片
+    overflow-x: auto
+    line-height: 1.6
+
+    code
+      // pre 内层不要再叠一层内边距和底色
+      padding: 0
+      background: none
+
+  // ===== 列表 =====
+  // reset 里有 `ol,ul,li { list-style: none }`，这里把标记恢复回来。
+  //
+  // ⚠ 标记必须打在 li 上，不能在 ul / ol 上写：li 自己的 `list-style: none` 会压过
+  //   从 ul 继承下来的 disc（实测：ul 算出来是 disc，li 仍是 none，列表就是没有圆点的）
+  ul, ol
+    margin: 0 0 1em
+    padding-left: 1.6em
+
+  ul > li
+    list-style: disc
+
+  ul ul > li
+    list-style: circle
+
+  ol > li
+    list-style: decimal
+
+  li
+    margin: 0.3em 0
+
+    // 嵌套列表紧贴父项，不留一大段空隙
+    > ul, > ol
+      margin-top: 0.3em
+      margin-bottom: 0
+
+  // ===== 强调 =====
+  // reset 的 `font-weight: normal` + `font: inherit` 把这两个也抹平了
+  strong, b
+    font-weight: 700
+
+  em, i
+    font-style: italic
+
+  // ===== 引用 =====
+  blockquote
+    margin: 0 0 1.2em
+    padding: $theme-spacing.sm $theme-spacing.lg
+    border-left: 4px solid var(--theme-font-fst)
+    border-radius: 0 $theme-radius.xs $theme-radius.xs 0
+    background-color: var(--theme-bgc-linkCard)
+    color: var(--theme-font-trd)
+
+    p:last-child
+      margin-bottom: 0
+
+  // ===== 链接 =====
+  a
+    color: var(--theme-font-sec)
+    text-decoration: none
+
+    &:hover
+      text-decoration: underline
+
+  // ===== 表格 =====
+  table
+    width: 100%
+    margin: 0 0 1.2em
+    // reset 已经给了 border-collapse: collapse
+    font-size: $theme-fz.sm
+
+  th, td
+    padding: $theme-spacing.sm $theme-spacing.base
+    border: 1px solid rgba(0, 0, 0, 0.08)
+    text-align: left
+
+  th
+    font-weight: 700
+    background-color: var(--theme-bgc-linkCard)
+
+  // ===== 图片 =====
+  img
+    max-width: 100%
+    height: auto
+    border-radius: $theme-radius.md
+
+  // ===== 分隔线 =====
+  hr
+    margin: 1.6em 0
+    border: none
+    border-top: 1px dashed var(--theme-border-strong)

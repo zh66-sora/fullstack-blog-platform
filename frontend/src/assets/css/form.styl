@@ -1,0 +1,220 @@
+@import 'themes.styl'
+
+// ============================================================
+// 表单基底 —— .blog-write--* 的那套「卡片壳 + 顶栏 + 字段 + 末行按钮」
+// ------------------------------------------------------------
+// 迁移自 myBlog/src/styl/write.styl，被两个页面共用：
+//   Write.vue  写博客
+//   Info.vue   个人中心 / 修改个人资料（原 profile.hbs 的
+//              <form class="blog-write--editor blog-card"> 就是照搬这套壳）
+//
+// ⚠ 这些类名此前只写在 views/Write.vue 的 <style> 里（非 scoped，但组件样式
+//   只有该组件被加载时才注入）。Info.vue 要用同一套类名，复制一份必然走样，
+//   所以提到 main.js 全局引入的这一层。
+//
+// ⚠ 只提取**两个页面真的都在用**的部分。只属于写博客页的留在 Write.vue：
+//   .blog-write--category*（板块选单）、.blog-write--tags* / --tag_*（标签）
+//
+// 调整记录（2026-09 样式优化，两个页面一起生效）：
+//   ① 描边 / 底色改走 themes.styl 的冷调 token，不再散写 #ccc / #eee
+//   ② 只读态与编辑态用底色区分开（原来两种状态长得一模一样，看不出在不在编辑）
+//   ③ 新增 .blog-form--section_title：表单分区小标题
+//   ④ .blog-write--submit 从 Write.vue 收上来（个人中心的「保存」也要用）
+//
+// ⚠ 声明统一写「属性: 值」带冒号形式 —— Stylus 对「无冒号 + 值是多段」有歧义，
+//   紧跟缩进更深的嵌套块时会被当成选择器解析、整条静默丢失（详见 component.styl）。
+// ============================================================
+
+// ===== 卡片：顶栏要是「贴边整条色块」 =====
+// el-card 默认给 header/body 各留 24px 内边距，顶栏就贴不到卡片边缘；
+// 两段都归零，内边距交回 .blog-write--body 自己给。
+// ⚠ 权重写到 4 个类：要压过 component.styl 的 `.el-card.blog-card .el-card__header`
+//   （同权重时看注入顺序，靠不住）
+.el-card.blog-card.blog-write--editor
+  .el-card__header
+    padding: 0
+  .el-card__body
+    padding: 0
+
+// ===== 顶栏：返回按钮 + 标题 =====
+.blog-write--header
+  display: flex
+  align-items: center
+  padding: $theme-spacing.base
+  background-color: var(--theme-bgc-deepBtn)
+  color: var(--theme-font-fst)
+  // 原项目两处不一致（write.styl 写 md=12px、column 写 lg=16px），
+  // 与卡片圆角 $theme-radius.lg 对齐后四角才严丝合缝
+  border-radius: $theme-radius.lg $theme-radius.lg 0 0
+
+  h3
+    font-size: $theme-fz.lg
+    font-weight: 700
+
+.blog-write--back
+  display: flex
+  align-items: center
+  justify-content: center
+  width: 36px
+  height: 36px
+  margin-right: $theme-spacing.base
+  border-radius: 50%
+  // 原来是写死的白圆钮（压在主题色头栏上）→ 跟卡片底走
+  background-color: var(--theme-bgc-card)
+  color: var(--theme-font-fst)
+  cursor: pointer
+  transition: all 0.2s ease
+
+  &:hover
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.2)
+    transform: translateY(-2px)
+
+// ===== 表单主体 =====
+.blog-write--body
+  padding: 20px $theme-spacing.lg 30px
+
+.blog-write--field
+  margin-top: $theme-spacing.lg
+
+// Label：Type A —— 贴着输入框上沿的色块（只圆上面两个角）
+.blog-write--label
+  display: inline-block
+  box-sizing: border-box
+  padding: $theme-spacing.sm $theme-spacing.base
+  border-radius: $theme-radius.md $theme-radius.md 0 0
+  background-color: var(--theme-bgc-deepBtn)
+  color: var(--theme-font-fst)
+  cursor: default
+
+// Label：Type B —— 左右结构里左侧那个（四角都圆）
+.blog-write--label_side
+  border-radius: $theme-radius.md
+  flex-shrink: 0
+
+// 输入框：盖掉 global.styl 里 reset 掉的原生样式
+// （border-top: none —— 上沿要跟 label 的色块拼在一起）
+.blog-write--editor .blog-write--input
+  display: block
+  box-sizing: border-box
+  width: 100%
+  margin: 0
+  padding: 0 $theme-spacing.base
+  line-height: 46px
+  border: 1px solid var(--theme-border)
+  border-top: none
+  border-radius: 0 $theme-radius.xs $theme-radius.xs $theme-radius.xs
+  color: var(--theme-font-light)
+  outline: none
+  transition: background-color 0.2s ease, border-color 0.2s ease
+
+  // 只读态（查看模式）：极浅冷底 —— 像一栏「已填好的信息」
+  background-color: var(--theme-bgc-input)
+
+  &::placeholder
+    color: var(--theme-font-placeholder)
+
+  // 编辑态：白底 —— 一眼就能分出哪些字段现在能改、哪些不能
+  &:not(:disabled)
+    background-color: var(--theme-bgc-input-edit)
+
+    &:focus
+      outline: none
+      border-color: var(--theme-font-fst)
+
+// 左右结构的一行（板块 / 标签 / 封面图 / 头像 / 背景图）
+.blog-write--field_row
+  display: flex
+  align-items: flex-start
+  gap: $theme-spacing.base
+
+// ============================================================
+// 表单分区小标题
+//
+// 原项目整张表单是一条平铺的字段流，从头到尾没有任何分隔，十来个字段的
+// 视觉权重完全一样，看不出分了几块。这里每个分区给一句小标题：
+// 左侧一根主色竖条 + 右侧渐隐细线 —— 与全局 .blog-card--header
+// （component.styl 里那条 4px 竖条 + 渐隐线）是同一套语言，
+// 只是字号更小、语气更轻，于是形成三级层次：
+//     卡片标题（20px 色块） > 分区标题（16px 主色字 + 竖条） > 字段标签（浅蓝色块）
+// ============================================================
+.blog-form--section_title
+  display: flex
+  align-items: center
+  gap: $theme-spacing.sm
+  margin-top: $theme-spacing.xl
+  color: var(--theme-font-fst)
+  font-size: $theme-fz.base
+  font-weight: 700
+
+  &::before
+    content: ''
+    flex: 0 0 4px
+    width: 4px
+    height: 16px
+    border-radius: $theme-radius.xxs
+    background-color: var(--theme-font-fst)
+
+  // 右侧渐隐细线：同 .blog-card--header 的 ::after
+  &::after
+    content: ''
+    flex: 1
+    height: 1px
+    background: linear-gradient(to right, var(--theme-accent-hi), var(--theme-accent-none))
+
+// 分区里的第一个字段贴着标题，不再吃 .blog-write--field 的 24px 上边距
+.blog-form--section_title + .blog-write--field,
+.blog-form--section_title + .blog-write--field_row
+  margin: $theme-spacing.base 0
+
+// 第一个分区标题不需要上边距（卡片 body 的内边距已经给了）
+.blog-form--section_title:first-child
+  margin-top: 0
+
+// ===== 末行：按钮组 =====
+.blog-write--actions
+  display: flex
+  justify-content: flex-end
+  gap: $theme-spacing.base
+  margin-top: $theme-spacing.xl
+
+.blog-write--btn
+  padding: $theme-spacing.sm $theme-spacing.lg
+  border: none
+  border-radius: $theme-radius.md
+  background-color: var(--theme-bgc-deepBtn)
+  color: var(--theme-font-fst)
+  font-size: $theme-fz.base
+  cursor: pointer
+  transition: all 0.2s ease
+
+  &:hover
+    background-color: var(--theme-font-sec)
+    color: #fff
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.15)
+    transform: translateY(-2px)
+
+  // 提交中按钮禁用：配色用项目里那张「禁用按钮」灰，并且不保留 hover 的位移
+  &:disabled
+    background-color: var(--theme-bgc-disabledBtn)
+    color: #fff
+    cursor: not-allowed
+    transform: none
+    box-shadow: none
+
+// 提交 / 保存：实心主色（写博客页的「发表」、个人中心的「保存」共用）
+// ⚠ 权重 (0,2,0) 压过 base 的 (0,1,0)；而 :hover / :disabled 都写在这里，
+//   权重 (0,3,0) 压过 base 的同名伪类 —— 不用靠注入顺序
+.blog-write--btn.blog-write--submit
+  background-color: var(--theme-font-fst)
+  color: #fff
+
+  &:hover
+    background-color: var(--theme-font-sec)
+    color: #fff
+
+  &:disabled
+    background-color: var(--theme-bgc-disabledBtn)
+    color: #fff
+    cursor: not-allowed
+    transform: none
+    box-shadow: none

@@ -1,0 +1,506 @@
+@import 'themes.styl'
+
+// ============================================================
+// 评论区 + 楼中楼弹窗
+//   迁移自原项目 myBlog/src/styl/comment.styl
+//
+// 与原文的差异：
+//   ① 颜色全部换成新项目的 CSS 变量（--theme-*），间距/圆角/字号沿用同名 Stylus 哈希
+//   ② 删掉三段不属于评论功能的样式，它们各有归属：
+//        .blog-article--actions / --action_item  → 已迁进 views/Article.vue
+//        .blog-float--*（浮动快捷选单）           → 已迁进 components/base/FloatMenu.vue
+//        .blog-like--*（点赞粒子动画）           → 属文章点赞功能，未迁
+//   ③ 删掉 .blog-comment--level（等级徽章）—— User 模型没有 level 字段，
+//      原项目那个恒为 Lv.0 的徽章还是从 DOM 里反读出来的，属无效信息
+//   ④ 原 .blog-comment--mount 改名为 .blog-comment--wrap（它就是 CommentSection 的根节点）
+//   ⑤ 弹窗去掉原项目的 .blog-modal 容器 + .blog-comment_modal--wrap 两层外壳：
+//      现在用 el-dialog 承载，遮罩/动画/滚动锁定/z-index 都由它负责，这里只削平默认外观
+//   ⑥ 配图改用 el-image：固定尺寸 + fit="cover" + 点击预览，与 ArticleCardPic 的封面同一套做法
+//      （原项目是 max-width/max-height 的裸 img，尺寸随图变化且点击无反应）
+//
+// ⚠ 本文件所有声明统一写成「属性: 值」的带冒号形式 ——
+//   Stylus 对「无冒号 + 值是多段」的声明有歧义，紧跟缩进更深的嵌套块时
+//   会被当成选择器解析、整条静默丢失（详见 component.styl 顶部说明）。
+// ============================================================
+
+// ===== 评论区整体 =====
+.blog-comment--wrap
+  margin-top: $theme-spacing.lg
+
+// ===== 评论输入卡片 =====
+.blog-comment--input_card
+  margin-bottom: $theme-spacing.lg
+
+.blog-comment--input_header
+  margin-bottom: $theme-spacing.base
+  font-size: $theme-fz.sm
+  color: var(--theme-font-trd)
+
+// 输入框用 el-input(type="textarea") —— 样式要打到它内部的 .el-textarea__inner 上，
+// 打在外层 .el-textarea 上不生效（element 自己给 inner 加了边框/圆角/底色）
+.blog-comment--textarea
+  .el-textarea__inner
+    width: 100%
+    box-sizing: border-box
+    border: 1px solid var(--theme-border)
+    border-radius: $theme-radius.xs
+    padding: $theme-spacing.base
+    font-size: $theme-fz.base
+    font-family: inherit
+    resize: none
+    min-height: 60px
+    max-height: 120px
+    color: var(--theme-font-light)
+    transition: border-color 0.2s
+
+    &:focus
+      outline: none
+      border-color: var(--theme-font-fst)
+
+.blog-comment--input_footer
+  display: flex
+  justify-content: space-between
+  align-items: center
+  margin-top: $theme-spacing.base
+
+.blog-comment--input_tools
+  display: flex
+  gap: $theme-spacing.sm
+  align-items: center
+
+// 工具按钮（表情 / 图片）：el-button 承载，做成无边框的图标按钮
+// ⚠ 权重 (0,2,0)：压过 element 的 .el-button(0,1,0) / .el-button--small(0,1,0)
+.el-button.blog-comment--tool_btn
+  margin: 0
+  padding: $theme-spacing.xs $theme-spacing.sm
+  height: auto
+  line-height: 1.5
+  border: none
+  border-radius: $theme-radius.xs
+  background-color: transparent
+  transition: background-color 0.2s
+
+  i
+    font-size: 20px
+    color: var(--theme-font-trd)
+
+  &:hover,
+  &:focus
+    background-color: var(--theme-bgc-deepBtn)
+
+    i
+      color: var(--theme-font-fst)
+
+  // 表情面板打开态：按钮保持按下感（面板由 .blog-emoji--wrap 承载，见 emoji.styl）
+  &.is-active
+    background-color: var(--theme-bgc-deepBtn)
+
+    i
+      color: var(--theme-font-fst)
+
+// el-upload 只当「选文件」的壳（auto-upload=false，列表也不显示），
+// 视觉完全交给里面的 .blog-comment--tool_btn
+.blog-comment--tool_upload
+  display: inline-flex
+
+.blog-comment--pic_name
+  font-size: $theme-fz.sm
+  color: var(--theme-font-sec)
+  max-width: 120px
+  overflow: hidden
+  text-overflow: ellipsis
+  white-space: nowrap
+
+// 发表按钮直接用全局的 .blog-btn--submit（见 component.styl）——
+// 与登录表单、确认弹窗的确定按钮是同一套视觉，这里不再单独写一份
+// （原来这里按 .blog-comment--input_footer .el-button 又抄了一遍，已删）
+
+// ===== 评论列表卡片 =====
+.blog-comment--list_header
+  font-weight: 700
+  font-size: $theme-fz.lg
+  color: var(--theme-font-light)
+  padding-bottom: $theme-spacing.base
+  border-bottom: 1px solid var(--theme-border-light)
+  margin-bottom: $theme-spacing.base
+
+// ===== 评论项 =====
+.blog-comment--item
+  display: flex
+  gap: $theme-spacing.base
+  padding: $theme-spacing.base 0
+  border-bottom: 1px solid var(--theme-border-light)
+
+  &:last-child
+    border-bottom: none
+
+// 评论 / 留言的主头像圆框（40x40）。
+// ⚠ 这里的尺寸**必须和 UserLink 的档位对齐**：40px 对应 size="md"。
+//   混用会翻车 —— 早先外框写 40x40、UserLink 却传 size="sm"（32px），
+//   el-image 就成了「宽走 32、高走 100%(=40)」的 32x40 椭圆。
+//   两个来源要么都 32（sm）、要么都 40（md），不能一边一个。
+.blog-comment--avatar
+  flex-shrink: 0
+  width: 40px
+  height: 40px
+  border-radius: 50%
+  overflow: hidden
+
+  img
+    width: 100%
+    height: 100%
+    object-fit: cover
+
+// el-image 是 inline-block 且自身没有尺寸，塞进固定大小的头像圆框里必须自己撑满
+// （用 el-image 而不是裸 img 的原因：后端默认头像 URL 指向 127.0.0.1:3000，
+//   换了环境就是 404 —— el-image 会渲染错误占位而不是撑破布局的裂图）
+.blog-comment--avatar .el-image,
+.blog-comment--reply_avatar .el-image
+  display: block
+  width: 100%
+  height: 100%
+
+.blog-comment--body
+  flex: 1
+  min-width: 0
+
+.blog-comment--meta
+  margin-bottom: 4px
+
+.blog-comment--meta_top
+  display: flex
+  align-items: center
+  gap: $theme-spacing.sm
+
+.blog-comment--nickname
+  font-weight: 600
+  color: var(--theme-font-fst)
+  font-size: $theme-fz.sm
+
+// 删除：el-button 承载的图标按钮
+.el-button.blog-comment--delete
+  margin: 0 0 0 auto
+  padding: 0
+  height: auto
+  line-height: 1.5
+  border: none
+  border-radius: $theme-radius.xs
+  background-color: transparent
+  color: var(--theme-font-trd)
+  font-size: 14px
+
+  &:hover,
+  &:focus
+    background-color: transparent
+    color: var(--theme-font-danger)
+
+.blog-comment--ip
+  font-size: 12px
+  color: var(--theme-font-trd)
+
+.blog-comment--content
+  font-size: $theme-fz.base
+  color: var(--theme-font-light)
+  line-height: 1.6
+  word-break: break-word
+
+  p
+    margin: 0
+
+// 配图：按原比例缩放，不再裁成固定方框
+//
+// 之前是「200×200 固定方框 + fit=cover」—— 长方形图会被裁成正方形，
+// 左右两侧的内容直接被截掉（概览模式下尤其明显）。
+// 现在把约束打在 img 上：max-width / max-height 会自动按比例缩放，
+// el-image 的外层盒子是 inline-block，会跟着 img 的实际尺寸收缩。
+// ⚠ 前提：element 的 .el-image__inner 只有 vertical-align，没有 width/height，
+//   所以 img 是「固有尺寸」渲染的，max-* 才能起到等比缩放的作用。
+.blog-comment--content_img
+  display: inline-block
+  max-width: 200px
+  border-radius: $theme-radius.xs
+  margin-bottom: $theme-spacing.sm
+  cursor: zoom-in
+
+  .el-image__inner
+    display: block
+    // 宽高都给 auto，让浏览器按原比例取；两个 max-* 只做上限
+    width: auto
+    height: auto
+    max-width: 100%
+    max-height: 260px
+    border-radius: $theme-radius.xs
+
+.blog-comment--footer
+  display: flex
+  align-items: center
+  gap: $theme-spacing.base
+  margin-top: $theme-spacing.sm
+
+.blog-comment--time
+  font-size: $theme-fz.sm
+  color: var(--theme-font-trd)
+
+// 评论项底部的操作区：时间靠左，回复 + 赞/踩 靠右
+.blog-comment--actions
+  display: flex
+  align-items: center
+  gap: $theme-spacing.base
+  margin-left: auto
+
+// 「回复」按钮（赞/踩 由公共组件 HabitBar 负责，不在这里）
+.el-button.blog-comment--action_btn
+  margin: 0
+  padding: 0
+  height: auto
+  line-height: 1.5
+  font-size: $theme-fz.sm
+  border: none
+  border-radius: $theme-radius.xs
+  background-color: transparent
+  color: var(--theme-font-trd)
+  display: inline-flex
+  align-items: center
+  gap: 2px
+
+  i
+    font-size: 15px
+
+  &:hover,
+  &:focus
+    background-color: transparent
+    color: var(--theme-font-fst)
+
+// ===== 嵌套回复预览 =====
+.blog-comment--replies
+  margin-top: $theme-spacing.sm
+  background-color: var(--theme-bgc-linkCard)
+  border-radius: $theme-radius.xs
+  padding: $theme-spacing.sm
+
+.blog-comment--reply
+  display: flex
+  gap: $theme-spacing.sm
+  padding: $theme-spacing.sm 0
+  border-bottom: 1px solid var(--theme-border-light)
+
+  &:last-child
+    border-bottom: none
+
+.blog-comment--reply_avatar
+  flex-shrink: 0
+  width: 32px
+  height: 32px
+  border-radius: 50%
+  overflow: hidden
+
+  img
+    width: 100%
+    height: 100%
+    object-fit: cover
+
+.blog-comment--reply_body
+  flex: 1
+  min-width: 0
+
+.blog-comment--reply_meta
+  font-size: $theme-fz.sm
+  margin-bottom: 2px
+
+.blog-comment--reply_nickname
+  font-weight: 600
+  color: var(--theme-font-fst)
+
+.blog-comment--reply_at
+  color: var(--theme-font-trd)
+  margin: 0 2px 0 6px
+
+.blog-comment--reply_at_name
+  color: var(--theme-font-fst)
+  font-weight: 600
+
+.blog-comment--reply_content
+  font-size: $theme-fz.base
+  color: var(--theme-font-light)
+  line-height: 1.5
+  word-break: break-word
+
+  // 正文用 <p>（块级）才能把配图挤到独立一行，代价是要清掉浏览器默认的外边距
+  p
+    margin: 0
+
+// 回复配图：同样按原比例缩放（比评论配图小一号）
+.blog-comment--reply_img
+  display: inline-block
+  max-width: 120px
+  border-radius: $theme-radius.xs
+  margin-bottom: 4px
+  cursor: zoom-in
+
+  .el-image__inner
+    display: block
+    width: auto
+    height: auto
+    max-width: 100%
+    max-height: 160px
+    border-radius: $theme-radius.xs
+
+.blog-comment--reply_footer
+  display: flex
+  align-items: center
+  justify-content: space-between
+  margin-top: 4px
+
+.blog-comment--reply_actions
+  display: flex
+  align-items: center
+  gap: $theme-spacing.base
+
+// ===== 按钮：查看更多回复（el-button 承载，整宽浅底）=====
+.el-button.blog-comment--view_all
+  display: block
+  width: 100%
+  margin: $theme-spacing.xs 0 0
+  padding: $theme-spacing.sm
+  height: auto
+  line-height: 1.5
+  text-align: center
+  background-color: var(--theme-bgc-deepBtn)
+  color: var(--theme-font-fst)
+  border: none
+  border-radius: $theme-radius.xs
+  font-size: $theme-fz.sm
+  transition: background-color 0.2s, color 0.2s
+
+  &:hover,
+  &:focus
+    background-color: var(--theme-font-sec)
+    color: #fff
+
+// ===== 空态 =====
+.blog-comment--empty
+  text-align: center
+  padding: $theme-spacing.xl
+  color: var(--theme-font-trd)
+
+// ============================================================
+// 楼中楼弹窗（el-dialog 承载）
+// ============================================================
+
+// ⚠ 权重：element 的 `.el-dialog` 是 (0,1,0)，这里用 `.el-dialog.blog-comment_modal--dialog` (0,2,0)。
+//   本项目 component.styl 比视图组件更晚注入，同权重时会吃亏，所以一律提权写。
+//   width 由 el-dialog 的 prop 以行内样式给出，不在这里覆盖。
+//
+// ============================================================
+// ★ 弹窗高度：整窗不许顶破视口（这是「显示不全」的修复点）
+//
+// 原来的写法是给正文 `max-height: 70vh`，整窗高度 = 5vh(上外距) + 头 + 70vh + 50px(下外距)。
+// 看着正好，实际会**超出视口 80px 左右**，于是 .el-dialog__wrapper 出现外层滚动条，
+// 弹窗底边（以及能看见的最后一条回复）被顶到屏幕外面 —— 就是这次报的问题。
+//
+// 根因是 `zoom`：global.styl 给 body 设了 `zoom: 1.25`，而 **vh 是按未缩放的视口算的**，
+// 元素在 zoom 子树里又要再放大 1.25 倍 —— 写 70vh，屏幕上实际占 87.5vh。
+// 实测（1440×900）：正文 630px→屏幕上 787.5、头部 60px→75、上外距 45px→56.25，
+// 合计 981.25 > 900。
+//
+// 所以这里不再用 vh 定高，改成让 flex 分配：
+//   ① 用 `max-height: calc(100% - …)` 给整窗封顶 ——
+//      百分比相对的是 .el-dialog__wrapper（position: fixed; inset: 0），
+//      它的高度**就是「当前缩放坐标系下的视口」**，正好绕开 vh 那个坑；
+//   ② 头部按内容占高（flex: 0 0 auto），正文吃掉剩下的（flex: 1 1 auto）+ 自己滚。
+//      这样以后改头部的字号 / 内边距，高度也会自动重算，不用再来调数字。
+//
+// ⚠ calc 里减掉的 5vh 是 el-dialog 的 `top` 属性给的行内 margin-top
+//   （见 components/comment/CommentModal.vue 的 top="5vh"），50px 是 element 自带的
+//   `.el-dialog { margin: 0 auto 50px }`。**改 top 属性时这里要一起改。**
+// ============================================================
+.el-dialog.blog-comment_modal--dialog
+  border-radius: $theme-radius.md
+  overflow: hidden
+  display: flex
+  flex-direction: column
+  max-height: calc(100% - 5vh - 50px)
+
+  .el-dialog__header
+    padding: 0
+    // 头部按内容占高，不参与压缩
+    flex: 0 0 auto
+
+  .el-dialog__body
+    padding: 0
+    // 吃掉剩余高度；min-height: 0 是必须的 —— flex 项默认 min-height: auto
+    // 会被内容顶住，写了 flex 也不会缩，滚动条就跑到外层去了
+    flex: 1 1 auto
+    min-height: 0
+    display: flex
+    flex-direction: column
+
+.blog-comment_modal--header
+  display: flex
+  align-items: center
+  justify-content: space-between
+  background-color: var(--theme-bgc-deepBtn)
+  color: var(--theme-font-fst)
+  padding: $theme-spacing.base
+  font-weight: 700
+  font-size: $theme-fz.lg
+
+  .blog-comment_modal--close
+    display: flex
+    align-items: center
+    justify-content: center
+    flex-shrink: 0
+    width: 36px
+    height: 36px
+    border: none
+    border-radius: 50%
+    // 原来是写死的白圆钮（压在主题色头栏上）→ 跟卡片底走
+    background-color: var(--theme-bgc-card)
+    color: var(--theme-font-fst)
+    cursor: pointer
+    transition: box-shadow 0.2s, transform 0.2s
+
+    i
+      font-size: 16px
+      pointer-events: none
+
+    &:hover
+      box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.2)
+      transform: translateY(-2px)
+
+// 弹窗正文：自己滚（也是弹窗内哨兵 InfiniteSentinel 的 root）
+// ⚠ 这里**不要**再写 max-height（原来那条 `max-height: 70vh` 就是高度失控的来源）——
+//   高度已经由上面 flex 分配好了：它只负责「吃掉剩余空间 + 自己滚」。
+//   min-height: 0 同样不能少，否则内容会把整窗顶高。
+.blog-comment_modal--body
+  flex: 1 1 auto
+  min-height: 0
+  overflow-y: auto
+  padding: $theme-spacing.base
+
+.blog-comment_modal--parent
+  padding-bottom: $theme-spacing.base
+
+.blog-comment_modal--divider
+  border-bottom: 10px solid var(--theme-border-light)
+
+.blog-comment_modal--replies
+  .blog-comment--reply
+    // 楼中楼之间的虚线：1px 虚线显色浅，用「强描边」档才分得清
+    border-bottom: 1px dashed var(--theme-border-strong)
+
+// ===== 响应式：xs（< 768px，Element 的 xs 上界 767px）=====
+@media only screen and (max-width: 767px)
+  // 配图在小屏按容器收缩（宽度由 img 的 max-width:100% 兜住，这里放开盒子上限）
+  .blog-comment--content_img,
+  .blog-comment--reply_img
+    max-width: 100%
+
+  // ⚠ 这里原来还有两条：
+  //     .el-dialog.blog-comment_modal--dialog { margin-top: 2vh }
+  //     .blog-comment_modal--body { max-height: 78vh }
+  //   两条都已删除，原因不同：
+  //   · margin-top：el-dialog 是按 `top` prop 写成**行内样式**的，作者样式压不过它，
+  //     所以这条从来就没生效过（一直是 5vh）—— 留着只会让人以为小屏已经调过间距。
+  //   · max-height：上边距不再需要「小屏多给点高度」——整窗封顶后正文本来就是
+  //     「剩多少占多少」，矮屏自动变矮，写死 vh 只会在大屏上顶破视口（就是这次的 bug）。

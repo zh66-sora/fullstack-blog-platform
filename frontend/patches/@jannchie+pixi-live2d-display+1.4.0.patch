@@ -1,0 +1,86 @@
+diff --git a/node_modules/@jannchie/pixi-live2d-display/dist/cubism4.es.js b/node_modules/@jannchie/pixi-live2d-display/dist/cubism4.es.js
+index 8f66461..b27afe5 100644
+--- a/node_modules/@jannchie/pixi-live2d-display/dist/cubism4.es.js
++++ b/node_modules/@jannchie/pixi-live2d-display/dist/cubism4.es.js
+@@ -10279,10 +10279,22 @@ var Live2DModel = class extends Container {
+ 		if (shouldUpdateTexture) this.cachedGlTextures.length = 0;
+ 		let flipYModified = false;
+ 		for (let i = 0; i < this.textures.length; i++) {
+-			var _this$cachedGlTexture, _webglRenderer$textur;
++			var _this$cachedGlTexture;
+ 			const texture = this.textures[i];
+ 			if (!texture.source) continue;
++			// Pixi 8 的 TextureGCSystem 依据 TextureSource._gcLastUsed（performance.now 时间戳，
++			// 默认 60 秒未使用即 unload）回收 GPU 纹理。Live2D 每帧都在用这些纹理，但绕过了
++			// Pixi 的纹理绑定管线，因此必须在此手动刷新时间戳，否则长时间运行后纹理被回收，
++			// 模型会渲染成空白/色块。
++			const gcSystem = webglRenderer.gc;
++			const gcNow = gcSystem && typeof gcSystem.now === "number" ? gcSystem.now : performance.now();
++			if (texture.source._gcLastUsed !== void 0) texture.source._gcLastUsed = gcNow;
+ 			let glTexture = (_this$cachedGlTexture = this.cachedGlTextures[i]) !== null && _this$cachedGlTexture !== void 0 ? _this$cachedGlTexture : null;
++			// 若缓存句柄已被（误）回收删除，则失效并重新提取，避免绑定到已删除的 GL 纹理
++			if (glTexture && !webglRenderer.gl.isTexture(glTexture)) {
++				glTexture = null;
++				this.cachedGlTextures[i] = null;
++			}
+ 			if (!glTexture) {
+ 				glTexture = this.extractWebGLTexture(webglRenderer, texture);
+ 				this.cachedGlTextures[i] = glTexture;
+@@ -10292,7 +10304,6 @@ var Live2DModel = class extends Container {
+ 				}
+ 			}
+ 			if (this.isWebGLTexture(glTexture) && this.internalModel) this.internalModel.bindTexture(i, glTexture);
+-			if (((_webglRenderer$textur = webglRenderer.textureGC) === null || _webglRenderer$textur === void 0 ? void 0 : _webglRenderer$textur.count) && texture.source) texture.source.touched = webglRenderer.textureGC.count;
+ 		}
+ 		if (flipYModified) webglRenderer.gl.pixelStorei(WebGLRenderingContext.UNPACK_FLIP_Y_WEBGL, false);
+ 		const worldTransform = this.worldTransform || this.groupTransform || this.localTransform;
+@@ -10318,7 +10329,32 @@ var Live2DModel = class extends Container {
+ 					this.deltaTime = 0;
+ 				}
+ 				internalModel.updateTransform(internalTransform);
++				// 在进入 Cubism 的原生 GL 绘制前解绑 Pixi 当前使用的 VAO：
++				// WebGL2 中 ELEMENT_ARRAY_BUFFER 绑定属于“当前绑定的 VAO”，而 Cubism 绘制
++				// 结束时会执行 bindBuffer(ELEMENT_ARRAY_BUFFER, null)。若此时绑定的恰是
++				// Pixi 批处理管线的 VAO，其索引缓冲绑定会被清空，之后 Pixi 复用该 VAO 时
++				// drawElements 会因缺少索引缓冲而全部失败（叠加的手等 Sprite 因此不渲染）。
++				const geometrySystem = webglRenderer.geometry;
++				if (geometrySystem && typeof geometrySystem.unbind === "function") {
++					geometrySystem.unbind();
++				}
+ 				internalModel.draw(webglRenderer.gl);
++				// Live2D 通过原生 GL 调用绘制，会绕过并打乱 Pixi 缓存的 GL 状态
++				// （绑定的顶点/索引缓冲、VAO、着色器、混合状态等）。若不在此复位，
++				// 同一帧内后续 Pixi 精灵的批处理绘制会因状态失配而静默失败。
++				if (typeof webglRenderer.resetState === "function") webglRenderer.resetState();
++				// 第 4 处修复：Cubism 绘制遮罩时会自己 raw 调 gl.clearColor(1, 1, 1, 0)
++				//（白 RGB + alpha 0 —— 官方 SDK 就是用它清遮罩缓冲的）。
++				// 而 Pixi 的清屏颜色是**带缓存**的（GlRenderTargetAdaptor.clear 只在“与上次不同”
++				// 时才真的调 gl.clearColor），于是 Pixi 每帧都以为“颜色没变、不用重设”，
++				// GL 里却留着 (1,1,1,0)：清屏清出 RGB=白 / alpha=0，
++				// 预乘合成下就是一块**白色方块**，正好把页面内容挡住。
++				// 这里把 GL 的 clearColor 恢复成 Pixi 自己认为的那个值（本项目是透明）。
++				const bgSystem = webglRenderer.background;
++				if (bgSystem && bgSystem.color) {
++					const bgColor = bgSystem.color;
++					webglRenderer.gl.clearColor(bgColor.red, bgColor.green, bgColor.blue, bgSystem.alpha);
++				}
+ 			} catch (error) {
+ 				console.error("Error in Live2D render callback:", error);
+ 			}
+@@ -10631,8 +10667,14 @@ var Cubism4MotionManager = class extends MotionManager {
+ 		const motion = CubismMotion.create(data);
+ 		const json = new CubismMotionJson(data);
+ 		const defaultFadingDuration = (group === this.groups.idle ? config.idleMotionFadingDuration : config.motionFadingDuration) / 1e3;
+-		if (json.getMotionFadeInTime() === void 0) motion.setFadeInTime(definition.FadeInTime > 0 ? definition.FadeInTime : defaultFadingDuration);
+-		if (json.getMotionFadeOutTime() === void 0) motion.setFadeOutTime(definition.FadeOutTime > 0 ? definition.FadeOutTime : defaultFadingDuration);
++		// 只有在 model3.json 未给出数值时才回退到默认时长：本模型的 23 个动作都显式写了
++		// "FadeInTime": 0 / "FadeOutTime": 0（立即生效、不淡入淡出），若按 "> 0" 判断会把
++		// 明确的 0 当成"未设置"而回退成 0.5 秒，动作本身却只有约 0.47 秒，导致动作结束时
++		// 参数还没走到目标值（"墨镜消失"停在 0.53、"难道说消失"停在 0.12，表现为半透明残留）。
++		const fadeIn = typeof definition.FadeInTime === "number" ? Math.max(0, definition.FadeInTime) : defaultFadingDuration;
++		const fadeOut = typeof definition.FadeOutTime === "number" ? Math.max(0, definition.FadeOutTime) : defaultFadingDuration;
++		if (json.getMotionFadeInTime() === void 0) motion.setFadeInTime(fadeIn);
++		if (json.getMotionFadeOutTime() === void 0) motion.setFadeOutTime(fadeOut);
+ 		motion.setEffectIds(this.eyeBlinkIds, this.lipSyncIds);
+ 		return motion;
+ 	}

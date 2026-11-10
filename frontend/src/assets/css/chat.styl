@@ -1,0 +1,666 @@
+@import 'themes.styl'
+
+// ============================================================
+// 聊天室（components/chat/ 下 6 个组件共用，所以放全局样式）
+//
+// 三段结构与需求一一对应：
+//   ① .blog-chat--head   行1  标题「聊天室」 + 工具栏（清屏 / 勿扰 / 关闭）
+//   ② .blog-chat--body   行2  左窄（用户列表） + 右宽（聊天记录）
+//   ③ .blog-chat--foot   行3  表情 + 输入框 + 发送
+//
+// 配色只用 themes.styl 的 --theme-* 与 $theme-*，不引新色系。
+// 唯二的例外是「在线 / 勿扰」两个状态色（#67C23A / #E6A23C）——
+// 主题令牌里没有语义绿/橙，而状态点必须有区分度；取的正是 element 的
+// success / warning，与全站表单校验色同一来源，不算引入新色系。
+// 「离线」用已有的 --theme-bgc-disabledBtn。
+//
+// ⚠ 所有声明统一写成「属性: 值」的带冒号形式（原因见 component.styl 顶部说明）。
+// ============================================================
+
+// ===== ① el-dialog 削成纯容器 =====
+// 白底/阴影/圆角全部交给 .blog-chat--wrap
+//
+// ⚠ 这里**故意不用** AuthModal 那套 `position: fixed; top: 50%; translate(-50%,-50%)`
+//   做「视口绝对居中」：body 上有 zoom: 1.25（见 global.styl 第 82 行），
+//   fixed 定位的百分比与元素自身尺寸不在同一个坐标系里 ——
+//   元素被放进视口后还要再放大 1.25 倍，于是整体被推到视口下方，底部的输入行被裁掉。
+//   （AuthModal 个子小、居中后上下余量够，所以没暴露这个问题；聊天室是固定高，一碰就露。）
+//
+//   改用 element 的常规流：`top` 属性 → 行内 margin-top，水平居中靠 .el-dialog 自带的
+//   `margin: 0 auto 50px`。这样还额外白捡一个好处 —— .el-dialog__wrapper 自带
+//   overflow: auto，万一弹窗真的比视口还高，用户可以滚下去够到输入行，
+//   而不是像 fixed 那样被永久钉在屏幕外。
+// ===== 垂直居中：让 wrapper 变 flex 容器 + 弹窗用 auto 外边距 =====
+// ⚠ 必须用 :has() 才能只命中聊天室这一个 wrapper ——
+//   `custom-class` 只加在 .el-dialog 身上，wrapper 拿不到任何区分标记。
+// ⚠ 为什么不用 justify-content / align-items: center：
+//   那套是「先居中、溢出后两头都出界」，顶部会跑到视口外面且滚不回来；
+//   而 auto 外边距在空间不足时会**退化成 0**（弹窗贴顶、容器照常滚动），
+//   是 flex 里唯一安全的居中写法。
+// ⚠ flex-shrink: 0 必写：wrapper 是 column 容器，默认 flex-shrink: 1 会把
+//   超高的弹窗「压扁」成容器高度，而不是让它溢出后由 wrapper 滚动。
+.el-dialog__wrapper:has(> .blog-chat--dialog)
+  display: flex
+  flex-direction: column
+
+.el-dialog.blog-chat--dialog
+  flex-shrink: 0
+  // el-dialog 的 width 是行内样式，只能靠 max-width 兜住窄屏
+  // ⚠ 76vw × zoom(1.25) ≈ 95vw，右侧留出余量
+  max-width: 76vw
+  background-color: transparent
+  box-shadow: none
+  border-radius: 0
+  // ⚠ 两个 !important 都是在压 element 写的东西：
+  //   margin-top  —— Dialog 组件把 `top` 属性以行内样式写死成 margin-top（默认 15vh）
+  //   margin-bottom —— .el-dialog 自带的 `margin: 0 auto 50px`
+  //   那 50px 就是「弹窗明明装得下、右侧却冒出一条滚动条、看着没居中」的元凶。
+  //   left/right 保持 element 的 auto，水平居中不受影响。
+  margin-top: auto !important
+  margin-bottom: auto !important
+
+  .el-dialog__header
+    padding: 0
+
+  .el-dialog__body
+    padding: 0
+
+  .el-dialog__footer
+    padding: 0
+
+// ===== ② 卡片本体：固定高度 + 纵向三段 =====
+.blog-chat--wrap
+  display: flex
+  flex-direction: column
+  width: 100%
+  height: 600px
+  min-height: 320px
+  // ⚠ 高度上限必须按**视口高度**给，并且要把 body 的 zoom: 1.25 算进去：
+  //   68vh × 1.25 = 85vh，配合 chat.styl 里 dialog 的 top: 4vh，上下都还有余量。
+  //   原来写死 600px（+ 78vh）在矮屏上（768 的笔记本，可视高度约 620）会顶出视口，
+  //   底部整行输入区 —— 表情按钮、输入框、发送键 —— 全在屏幕外，看着就像「表情没了」。
+  max-height: 68vh
+  border-radius: $theme-radius.lg
+  background-color: var(--theme-bgc-card)
+  box-shadow: 0 24px 60px rgba(52, 90, 140, 0.24), 0 2px 8px rgba(52, 90, 140, 0.08)
+  // ⚠ 这里**不能**写 overflow: hidden —— 表情面板是从输入行往上弹的，
+  //   一裁就看不见了。圆角改由 head / foot 各自带到对应的两个角上。
+
+// ===== ③ 行1：标题 + 工具栏 =====
+.blog-chat--head
+  display: flex
+  align-items: center
+  justify-content: space-between
+  flex-shrink: 0
+  padding: $theme-spacing.base 18px
+  border-radius: $theme-radius.lg $theme-radius.lg 0 0
+  background-color: var(--theme-bgc-deepBtn)
+
+  h3
+    position: relative
+    padding-left: 12px
+    font-size: 21px
+    font-weight: 700
+    letter-spacing: 0.5px
+    color: var(--theme-font-fst)
+
+    // 左侧主题色竖条：与 AuthModal / ConfirmModal 的标题头同一套语言
+    &::before
+      position: absolute
+      left: 0
+      top: 50%
+      content: ''
+      width: 4px
+      height: 18px
+      margin-top: -9px
+      border-radius: 999px
+      background: linear-gradient(to bottom, var(--theme-font-fst), var(--theme-font-sec))
+
+.blog-chat--tools
+  display: flex
+  align-items: center
+  gap: $theme-spacing.sm
+
+// 工具按钮（清屏 / 勿扰 / 关闭 / 表情 共用一个基类）
+.blog-chat--tool
+  display: inline-flex
+  align-items: center
+  justify-content: center
+  flex-shrink: 0
+  width: 32px
+  height: 32px
+  border-radius: 50%
+  color: var(--theme-font-trd)
+  font-size: 16px
+  cursor: pointer
+  user-select: none
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease
+
+  &:hover
+    background-color: var(--theme-bgc-lightBtn)
+    color: var(--theme-font-fst)
+
+  // 勿扰开启态 / 表情面板打开态
+  &.is-active
+    background-color: var(--theme-font-fst)
+    color: #fff
+
+  // 头部那三个：浅底头部上改成白色实心圆，hover 抬起来
+  .blog-chat--head
+    .blog-chat--tool
+      // 写死的 #fff → 卡片底（深色下自动变成深圆钮 + 主题色图标）
+      background-color: var(--theme-bgc-card)
+      color: var(--theme-font-fst)
+
+    &:hover
+      box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.2)
+      transform: translateY(-2px)
+
+    &.is-active
+      background-color: var(--theme-font-fst)
+      color: #fff
+
+// ===== ④ 行2：用户列表（左窄） + 聊天记录（右宽） =====
+.blog-chat--body
+  display: flex
+  flex: 1
+  min-height: 0
+  overflow: hidden
+
+.blog-chat--aside
+  display: flex
+  flex-direction: column
+  flex-shrink: 0
+  width: 200px
+  border-right: 1px solid var(--theme-border-light)
+  background-color: var(--theme-bgc-linkCard)
+
+.blog-chat--aside_head
+  display: flex
+  align-items: center
+  justify-content: space-between
+  flex-shrink: 0
+  padding: $theme-spacing.sm $theme-spacing.base
+  border-bottom: 1px solid var(--theme-border-light)
+
+.blog-chat--aside_title
+  font-size: $theme-fz.sm
+  font-weight: 700
+  color: var(--theme-font-light)
+
+.blog-chat--aside_count
+  font-size: 12px
+  color: var(--theme-font-trd)
+
+.blog-chat--aside_list
+  flex: 1
+  min-height: 0
+  overflow-y: auto
+  padding: $theme-spacing.xs 0
+
+  &::-webkit-scrollbar
+    width: 6px
+
+  &::-webkit-scrollbar-thumb
+    border-radius: 3px
+    background-color: var(--theme-border)
+
+.blog-chat--aside_empty
+  padding: $theme-spacing.lg 0
+  text-align: center
+  font-size: 12px
+  color: var(--theme-font-trd)
+
+// ---- 用户行 ----
+.blog-chat--user
+  display: flex
+  align-items: center
+  gap: $theme-spacing.sm
+  padding: $theme-spacing.sm $theme-spacing.base
+  transition: background-color 0.2s ease
+
+  &:hover
+    background-color: var(--theme-bgc-lightBtn)
+
+  // 离线整行压暗（状态点自己也变灰）
+  &.is-offline
+    opacity: 0.7
+
+.blog-chat--avatar
+  position: relative
+  flex-shrink: 0
+  width: 34px
+  height: 34px
+
+  .el-image
+    display: block
+    width: 100%
+    height: 100%
+    border-radius: 50%
+    overflow: hidden
+
+.blog-chat--avatar_fallback
+  display: flex
+  align-items: center
+  justify-content: center
+  width: 100%
+  height: 100%
+  background-color: var(--theme-bgc-main)
+  color: var(--theme-font-placeholder)
+
+// 状态点：右下角，白色描边把它从头像里「抠」出来
+.blog-chat--dot
+  position: absolute
+  right: -1px
+  bottom: -1px
+  box-sizing: content-box
+  width: 10px
+  height: 10px
+  border: 2px solid #fff
+  border-radius: 50%
+
+  &.is-online
+    background-color: #67C23A
+
+  &.is-dnd
+    background-color: #E6A23C
+
+  &.is-offline
+    background-color: var(--theme-bgc-disabledBtn)
+
+.blog-chat--user_info
+  display: flex
+  flex-direction: column
+  justify-content: center
+  gap: 2px
+  flex: 1
+  min-width: 0
+
+.blog-chat--user_status
+  font-size: 12px
+  line-height: 1.2
+
+  &.is-online
+    color: #67C23A
+
+  &.is-dnd
+    color: #E6A23C
+
+  &.is-offline
+    color: var(--theme-font-trd)
+
+.blog-chat--user_name
+  font-size: $theme-fz.sm
+  color: var(--theme-font-light)
+  overflow: hidden
+  text-overflow: ellipsis
+  white-space: nowrap
+
+.blog-chat--user_remark
+  width: 100%
+
+  .el-input__inner
+    height: 22px
+    line-height: 22px
+    padding: 0 6px
+    font-size: 12px
+    border-radius: $theme-radius.xxs
+
+.blog-chat--user_edit
+  display: inline-flex
+  align-items: center
+  justify-content: center
+  flex-shrink: 0
+  width: 24px
+  height: 24px
+  border-radius: 50%
+  font-size: 14px
+  color: var(--theme-font-placeholder)
+  cursor: pointer
+  transition: color 0.2s ease, background-color 0.2s ease
+
+  &:hover
+    color: var(--theme-font-fst)
+    background-color: var(--theme-bgc-card)
+
+// ---- 右侧：聊天记录 ----
+.blog-chat--main
+  display: flex
+  flex-direction: column
+  flex: 1
+  min-width: 0
+  background-color: var(--theme-bgc-card)
+
+// 连接状态提示条
+.blog-chat--net
+  flex-shrink: 0
+  padding: 5px $theme-spacing.base
+  font-size: 12px
+  text-align: center
+
+  &.is-reconnecting
+    // 底色原来写死 #FDF6EC（浅橙）—— 深色模式下是块亮斑，换成跟随主题的小控件底
+    background-color: var(--theme-bgc-chip)
+    color: #E6A23C
+
+  &.is-closed
+    // 原来写死 #FDF0F0，同理换成主题的「校验失败底」
+    background-color: var(--theme-bgc-danger)
+    color: var(--theme-font-danger)
+
+.blog-chat--scroll
+  flex: 1
+  min-height: 0
+  overflow-y: auto
+  padding: $theme-spacing.base 14px
+
+  &::-webkit-scrollbar
+    width: 8px
+
+  &::-webkit-scrollbar-thumb
+    border-radius: 4px
+    background-color: var(--theme-border)
+
+// 顶部：懒加载指示 / 没有更早的消息
+.blog-chat--more
+  height: 22px
+  line-height: 22px
+  text-align: center
+  font-size: 12px
+  color: var(--theme-font-trd)
+
+.blog-chat--list
+  display: block
+
+.blog-chat--row
+  display: block
+  margin-bottom: $theme-spacing.base
+
+  &:last-child
+    margin-bottom: 0
+
+.blog-chat--empty
+  padding: $theme-spacing.xl 0
+  text-align: center
+  font-size: $theme-fz.sm
+  color: var(--theme-font-trd)
+
+// ---- 系统提示：xx 加入了聊天室 / xx 离开了聊天室 ----
+.blog-chat--system
+  width: fit-content
+  max-width: 80%
+  margin: 0 auto
+  padding: 2px 10px
+  border-radius: 999px
+  background-color: var(--theme-bgc-chip)
+  font-size: 12px
+  color: var(--theme-font-trd)
+  text-align: center
+
+// ---- 气泡 ----
+.blog-chat--bubble_row
+  display: flex
+  align-items: flex-start
+  gap: $theme-spacing.sm
+
+  // 自己：整行翻转 → 头像在右、气泡在右
+  &.is-mine
+    flex-direction: row-reverse
+
+.blog-chat--bubble_avatar
+  flex-shrink: 0
+  width: 34px
+  height: 34px
+
+  .el-image
+    display: block
+    width: 100%
+    height: 100%
+    border-radius: 50%
+    overflow: hidden
+
+.blog-chat--bubble_box
+  display: flex
+  flex-direction: column
+  min-width: 0
+  // 留出对侧头像 + 间隙的宽度，长消息不会顶到对面去
+  max-width: calc(100% - 90px)
+
+.blog-chat--bubble_row.is-mine .blog-chat--bubble_box
+  align-items: flex-end
+
+.blog-chat--bubble_meta
+  display: flex
+  align-items: center
+  gap: $theme-spacing.sm
+  margin-bottom: 3px
+  font-size: 12px
+  color: var(--theme-font-trd)
+
+.blog-chat--bubble_name
+  font-weight: 600
+  color: var(--theme-font-fst)
+
+// 气泡本体
+// ⚠⚠ 这一段原先被**错误地嵌在 .blog-chat--bubble_name 里面**（缩进多了两级），
+//   Stylus 编译出来的选择器成了 `.blog-chat--bubble_name .blog-chat--bubble` ——
+//   可气泡是 name 的**兄弟**节点、不是后代，这条规则**永远匹配不到**。
+//   后果：气泡没有 padding / 圆角 / 描边 / 底色。
+//   而自己那侧还有一条写在顶层的 `.is-mine .blog-chat--bubble`（侥幸生效），
+//   它给了「主题色底 + 白字」却没有内边距和圆角 ——
+//   于是看起来就是「一行加了背景色的文字」，不像气泡；
+//   他人的气泡连底色都没有，在页面底上糊成一片、看不清。
+//   ⚠ 下面这些必须留在**顶层**（两级缩进），别再缩进回去。
+.blog-chat--bubble
+  position: relative
+  padding: 8px 12px
+  // 用 --theme-border 而不是 --theme-border-light：
+  // 他人气泡的底（--theme-bgc-card）与页面底只差一档明度，
+  // 弱描边在深色下几乎看不见，气泡就失去边界了
+  border: 1px solid var(--theme-border)
+  border-radius: $theme-radius.md
+  // 写死的 #fff → 卡片底（深色下气泡才不会是一块白）
+  background-color: var(--theme-bgc-card)
+  font-size: $theme-fz.sm
+  line-height: 1.6
+  color: var(--theme-font-light)
+  word-break: break-word
+  // 消息里的换行原样保留（textarea 里敲的回车要看得见）
+  white-space: pre-wrap
+
+  // 气泡尾巴：旋转 45° 的小方块，只画朝外的两条边 —— 比 border 三角好对齐圆角
+  &::before
+    position: absolute
+    top: 12px
+    width: 8px
+    height: 8px
+    content: ''
+    background-color: inherit
+    transform: rotate(45deg)
+
+// 他人：尾巴在左侧（旋转后，原「左边 + 下边」朝外）
+.blog-chat--bubble_row.is-other .blog-chat--bubble::before
+  left: -4px
+  border-left: 1px solid var(--theme-border)
+  border-bottom: 1px solid var(--theme-border)
+
+// 自己：主题色实底 + 白字 + 柔光（与页面上的主按钮一个语言）
+.blog-chat--bubble_row.is-mine .blog-chat--bubble
+  border-color: var(--theme-font-fst)
+  background-color: var(--theme-font-fst)
+  color: #fff
+  // 柔光跟着主题色走（原来写死 rgba(104,174,244,·)，换色相后仍是蓝的）
+  box-shadow: 0 6px 16px var(--theme-accent-glow)
+
+  // 尾巴在右侧（旋转后，原「上边 + 右边」朝外）
+  &::before
+    left: auto
+    right: -4px
+    border-top: 1px solid var(--theme-font-fst)
+    border-right: 1px solid var(--theme-font-fst)
+
+// ---- 新消息动效（transition-group name="chat-msg"）----
+// 自己从右滑入、他人从左滑入 —— 方向跟气泡所在的半边一致，
+// 系统提示只淡入（一句话居中飘过来一屏反而更吵）。
+@keyframes chatInRight
+  from
+    opacity: 0
+    transform: translateX(28px) scale(0.96)
+
+  to
+    opacity: 1
+    transform: translateX(0) scale(1)
+
+@keyframes chatInLeft
+  from
+    opacity: 0
+    transform: translateX(-28px) scale(0.96)
+
+  to
+    opacity: 1
+    transform: translateX(0) scale(1)
+
+@keyframes chatInFade
+  from
+    opacity: 0
+    transform: translateY(4px)
+
+  to
+    opacity: 1
+    transform: translateY(0)
+
+.chat-msg-enter-active
+  animation-name: chatInLeft
+  animation-duration: 0.3s
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1)
+  // both：进场前就停在 from 那一帧，避免「先闪一下再滑」
+  animation-fill-mode: both
+
+.chat-msg-enter-active.is-mine
+  animation-name: chatInRight
+
+.chat-msg-enter-active.is-system
+  animation-name: chatInFade
+
+// 上滑翻历史时补进来的那批不播动画（否则一屏旧消息集体飞进来，很吵）
+.blog-chat--list.is-restoring .chat-msg-enter-active
+  animation-duration: 0s
+  animation-name: none
+
+// 离场（清屏 / 切账号）不拖泥带水
+.chat-msg-leave-active
+  display: none
+
+// ===== ⑤ 行3：表情 + 输入 + 发送 =====
+.blog-chat--foot
+  position: relative
+  display: flex
+  align-items: center
+  gap: $theme-spacing.sm
+  flex-shrink: 0
+  padding: $theme-spacing.sm $theme-spacing.base
+  border-top: 1px solid var(--theme-border-light)
+  border-radius: 0 0 $theme-radius.lg $theme-radius.lg
+  background-color: var(--theme-bgc-card)
+
+.blog-chat--input
+  flex: 1
+  min-width: 0
+
+  .el-input__inner
+    height: 38px
+    line-height: 38px
+    padding: 0 $theme-spacing.base
+    font-size: $theme-fz.sm
+    color: var(--theme-font-light)
+    background-color: var(--theme-bgc-input)
+    border: 1px solid var(--theme-border)
+    border-radius: 999px
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease
+
+    &:hover
+      border-color: var(--theme-accent-hi)
+
+    &:focus
+      background-color: var(--theme-bgc-input-edit)
+      border-color: var(--theme-font-fst)
+      box-shadow: 0 0 0 3px var(--theme-accent-ring)
+
+// 发送：圆形实心主按钮，纸飞机
+.blog-chat--send
+  display: inline-flex
+  align-items: center
+  justify-content: center
+  flex-shrink: 0
+  width: 40px
+  height: 40px
+  border-radius: 50%
+  background-color: var(--theme-font-fst)
+  color: #fff
+  font-size: 19px
+  cursor: pointer
+  user-select: none
+  box-shadow: 0 6px 16px var(--theme-accent-glow)
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease
+
+  &:hover
+    background-color: var(--theme-font-sec)
+    transform: translateY(-1px)
+
+  &:active
+    transform: translateY(1px)
+
+  // 空内容 / 未连接：置灰且不可点
+  &.is-disabled
+    background-color: var(--theme-bgc-disabledBtn)
+    box-shadow: none
+    cursor: not-allowed
+
+    &:hover
+      background-color: var(--theme-bgc-disabledBtn)
+      transform: none
+
+// ============================================================
+// 头像换成公共组件 UserLink 之后的尺寸对齐
+//
+// ⚠ 根因（踩过）：UserLink 自带的尺寸档（user.styl 的 `.blog-user--link.is-xs
+//   .blog-user--avatar { width: 24px }`）只钉**宽**不钉高；聊天室这两个头像盒却是
+//   固定的 34×34。组件样式比全局注入得晚，同权重（0,2,0）下 is-xs 的 24px 会赢过
+//   这里的 width:100%，于是头像变成「宽 24、高 34」的**椭圆**。
+//   所以这里一律提到**三级选择器**（0,3,0），宽高都钉回 100%，与注入顺序无关。
+//
+// ⚠ 两处的结构还不一样：
+//   · 用户列表：UserLink 是「盒子（.blog-chat--avatar）里的子元素」
+//   · 消息气泡：UserLink 的根就是那个盒子（两个类挂在同一个 span 上）
+// ============================================================
+
+// 用户列表
+.blog-chat--avatar
+  .blog-user--link
+    width: 100%
+    height: 100%
+
+  .blog-user--link .blog-user--avatar
+    width: 100%
+    height: 100%
+
+// 消息气泡（根元素同时是 .blog-user--link 与 .blog-chat--bubble_avatar）
+.blog-chat--bubble_avatar.blog-user--link
+  .blog-user--avatar
+    width: 100%
+    height: 100%
+
+// ===== 响应式 =====
+// ⚠ 这里只按窗口**宽度**收窄用户列表，不再动高度：
+//   弹窗高度受限于窗口**高度**，已经由 max-height: 68vh 统一兜住了 ——
+//   按宽度去改高度是个错误的相关性（宽屏也可能是矮屏），之前那两处 height 覆盖已删。
+@media only screen and (max-width: 1280px)
+  .blog-chat--aside
+    width: 164px
+
+@media only screen and (max-width: 900px)
+  .blog-chat--aside
+    width: 132px
+
+  .blog-chat--bubble_box
+    max-width: calc(100% - 60px)

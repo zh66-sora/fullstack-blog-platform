@@ -1,0 +1,114 @@
+@import 'themes.styl'
+
+// ============================================================
+// 表情面板（components/base/EmojiPanel.vue）
+//   评论区与聊天室共用，所以放全局样式，不做 scoped
+//
+// 结构：
+//   .blog-emoji--wrap    调用方的定位锚点（触发按钮 + 面板都在里面）
+//     .blog-emoji--panel 面板本体（absolute，朝**上**弹出）
+//       .blog-emoji--tabs  分组标签
+//       .blog-emoji--grid  字形网格（超高滚动）
+//
+// ⚠ 为什么朝上弹：聊天室的输入行在弹窗最底部，朝下弹会被弹窗/视口裁掉。
+// ⚠ 为什么 wrap 要 z-index：评论区里输入卡片在评论列表**之前**渲染，
+//   同权重下后渲染的列表会盖住面板（面板是 absolute）——
+//   给 wrap 一个层级，整块（按钮 + 面板）就都压在上面了。
+// ============================================================
+
+.blog-emoji--wrap
+  position: relative
+  z-index: 10
+  display: inline-flex
+  align-items: center
+
+.blog-emoji--panel
+  position: absolute
+  bottom: calc(100% + 8px)
+  left: 0
+  width: 328px
+  padding: $theme-spacing.sm
+  box-sizing: border-box
+  border: 1px solid var(--theme-border-light)
+  border-radius: $theme-radius.md
+  background-color: var(--theme-bgc-card)
+  // 冷调投影，与 modal.styl 里弹窗的阴影同一族
+  box-shadow: 0 12px 30px rgba(52, 90, 140, 0.18), 0 2px 6px rgba(52, 90, 140, 0.08)
+  animation: blogEmojiIn 0.16s ease-out
+
+@keyframes blogEmojiIn
+  from
+    opacity: 0
+    transform: translateY(6px)
+
+  to
+    opacity: 1
+    transform: translateY(0)
+
+.blog-emoji--tabs
+  display: flex
+  gap: 2px
+  padding-bottom: $theme-spacing.sm
+  border-bottom: 1px solid var(--theme-border-light)
+
+.blog-emoji--tab
+  padding: 2px 10px
+  font-size: $theme-fz.sm
+  color: var(--theme-font-trd)
+  border-radius: 999px
+  cursor: pointer
+  user-select: none
+  transition: background-color 0.2s ease, color 0.2s ease
+
+  &:hover
+    color: var(--theme-font-fst)
+
+  &.is-active
+    background-color: var(--theme-bgc-deepBtn)
+    color: var(--theme-font-fst)
+    font-weight: 600
+
+.blog-emoji--grid
+  display: grid
+  grid-template-columns: repeat(8, 1fr)
+  gap: 2px
+  max-height: 192px
+  overflow-y: auto
+  padding-top: $theme-spacing.xs
+
+  // 细滚动条：面板很窄，用默认宽度会挤掉一列字形
+  &::-webkit-scrollbar
+    width: 6px
+
+  &::-webkit-scrollbar-thumb
+    border-radius: 3px
+    background-color: var(--theme-border)
+
+.blog-emoji--item
+  display: flex
+  align-items: center
+  justify-content: center
+  height: 32px
+  font-size: 20px
+  line-height: 1
+  border-radius: $theme-radius.xs
+  cursor: pointer
+  user-select: none
+  transition: background-color 0.15s ease, transform 0.15s ease
+
+  &:hover
+    background-color: var(--theme-bgc-lightBtn)
+    transform: scale(1.16)
+
+// 小屏：面板收窄（评论区在窄屏只剩一列，328px 会顶出容器）
+@media only screen and (max-width: 767px)
+  .blog-emoji--panel
+    width: 264px
+
+  .blog-emoji--grid
+    grid-template-columns: repeat(8, 1fr)
+    max-height: 160px
+
+  .blog-emoji--item
+    height: 28px
+    font-size: 18px

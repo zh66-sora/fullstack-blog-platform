@@ -1,0 +1,270 @@
+@import 'themes.styl'
+
+// ============================================================
+// 个人中心 / 修改个人资料（/info）
+// ------------------------------------------------------------
+// 迁移自 myBlog/src/styl/profile.styl（222 行）。
+//
+// 依赖 form.styl 里的表单基底（.blog-write--editor / --field / --label /
+// --input / --actions / --btn / --body），本文件只写 profile 自己的部分。
+//
+// ⚠ 原文件里几处「同属性写两遍、后者覆盖前者」的地方，下面给的是**实际生效值**
+//   （同权重看源顺序），不是笔误 —— 与 Write.vue 迁移时对 category_list 的处理一致。
+//
+// ⚠ 声明统一写「属性: 值」带冒号形式（原因见 component.styl 顶部）。
+// ============================================================
+
+// ===== 表单主体：仅左右 padding（复用 write 模式）=====
+.blog-profile--body
+  padding: 20px $theme-spacing.base 30px
+
+// ===== 选图用的隐藏 input =====
+// 原项目是每次点击动态 createElement('input') 再 remove()，这里常驻一个复用，
+// 所以必须有这条把它藏起来
+.blog-profile--file_picker
+  display: none
+
+// ===== 头像 / 背景图预览 =====
+.blog-profile--image_preview
+  position: relative
+  // 没有 img 时（背景图未设置）也要能点：靠 flex 居中把蒙版撑满
+  display: flex
+  align-items: center
+  justify-content: center
+  width: 120px
+  height: 120px
+  border-radius: $theme-radius.md
+  overflow: hidden
+  border: 1px solid var(--theme-border)
+  background-color: var(--theme-bgc-input)
+  cursor: pointer
+  flex-shrink: 0
+
+  img
+    position: absolute
+    top: 0
+    left: 0
+    display: block
+    width: 100%
+    height: 100%
+    object-fit: cover
+
+  // 背景图：更宽更矮
+  &.is-banner
+    width: 240px
+    height: 80px
+    flex: 1
+    max-width: 320px
+
+  // hover 蒙版
+  .blog-profile--image_mask
+    position: absolute
+    top: 0
+    left: 0
+    z-index: 1
+    display: flex
+    align-items: center
+    justify-content: center
+    width: 100%
+    height: 100%
+    background: rgba(0, 0, 0, 0.35)
+    opacity: 0
+    transition: opacity 0.25s ease
+
+    i
+      font-size: 32px
+      color: #fff
+
+// 仅在编辑态 hover 才显示蒙版（非编辑态不显示上传提示）
+// ⚠ 原文件把这条写成 `.blog-write--editor.is-editing &:hover .blog-profile--image_mask`
+//   嵌套在 .blog-profile--image_preview 里。看着像选择器写反了，实测 Stylus 会把它
+//   编译成下面这条（前导段提到最前、`&` 还原为父选择器），行为是对的 —— 这里直接写
+//   编译结果，避免下一个人再对着它算一遍。
+.blog-write--editor.is-editing .blog-profile--image_preview:hover .blog-profile--image_mask
+  opacity: 1
+
+// ===== 字段头部：label + 工具栏 左右分布（与下方表格无间隙）=====
+.blog-profile--field_header
+  display: flex
+  align-items: center
+  justify-content: space-between
+
+  .blog-write--label
+    flex: 0 0 auto
+
+// ===== 工具栏 +/- =====
+.blog-profile--toolbar
+  display: flex
+  gap: $theme-spacing.xs
+  width: 40px
+  border: 1px solid var(--theme-border)
+  border-radius: $theme-radius.xs
+  text-align: center
+
+  span
+    display: inline-flex
+    align-items: center
+    justify-content: center
+    width: 50%
+    height: 24px
+    border-radius: $theme-radius.xxs
+    color: var(--theme-font-fst)
+    font-size: 18px
+    font-weight: 700
+    cursor: pointer
+    user-select: none
+    transition: color 0.2s, background-color 0.2s, transform 0.15s
+
+    &:hover
+      color: #fff
+      background-color: var(--theme-font-fst)
+      transform: scale(1.1)
+
+.profile--social_add,
+.profile--link_add
+  width: 50%
+  border-right: 1px solid var(--theme-border)
+
+.profile--social_remove,
+.profile--link_remove
+  flex: 1
+
+// ===== 表（社交媒体 / 友情链接）=====
+// 完整的 2 列表格，边框与上方 label 紧密连接
+.blog-profile--table
+  width: 100%
+  table-layout: fixed
+  border: 1px solid var(--theme-border)
+  // 原文件先写 `border-radius: 0px 10px 10px 10px` 又在下面写 `0 0 md md`，
+  // 同权重后者生效 —— 这里只保留生效值
+  border-radius: 0 0 $theme-radius.md $theme-radius.md
+  overflow: hidden
+  background-color: var(--theme-bgc-input)
+
+  // 表头
+  // ⚠ 原来这里是「主题色深底 + 主题字色 + 加粗」，等于把表头做成了一个小标题条，
+  //   在同一张卡片里比普通列表项（侧边栏那几条导航 / 友链行）重得多。
+  //   现在改成和普通列表项同一套口径：不上主题色、不加粗，
+  //   只靠「比表格底色(#F4F8FC)深一档的浅蓝」把表头和内容分开。
+  thead th
+    padding: $theme-spacing.sm $theme-spacing.base
+    border-bottom: 1px solid var(--theme-border)
+    // 比表格底深一档，同色相（项目里「浅色按钮底」那个 token，正好是这个位置该用的色阶）
+    background-color: var(--theme-bgc-lightBtn)
+    // 三级灰字 —— 与 #aside 里普通列表项的字色同一个 token
+    color: var(--theme-font-trd)
+    font-size: $theme-fz.sm
+    font-weight: 400
+    text-align: left
+
+    // 列间竖线：中性描边（跟着表头的朴素口径走，不再用主色）
+    & + th
+      border-left: 1px solid var(--theme-border)
+
+  tbody td
+    padding: $theme-spacing.xs $theme-spacing.sm
+    border-bottom: 1px solid var(--theme-border-light)
+
+    // 列间竖线
+    & + td
+      border-left: 1px solid var(--theme-border-light)
+
+  tbody tr:last-child td
+    border-bottom: none
+
+  select,
+  input
+    box-sizing: border-box
+    width: 100%
+    padding: $theme-spacing.xs $theme-spacing.sm
+    border: 1px solid var(--theme-border)
+    border-radius: $theme-radius.xs
+    background-color: var(--theme-bgc-input-edit)
+    color: var(--theme-font-light)
+    font-size: $theme-fz.sm
+    outline: none
+
+    &::placeholder
+      color: var(--theme-font-placeholder)
+
+    &:focus
+      border-color: var(--theme-font-fst)
+
+    // 只读态：与 .blog-write--input 同一套口径（浅冷底 + 三级灰字 + 弱描边），
+    // 于是整张表在查看态里是「安静的一片」，不会一堆白框抢注意力
+    &:disabled
+      border-color: var(--theme-border-light)
+      background-color: var(--theme-bgc-input)
+      color: var(--theme-font-trd)
+      cursor: not-allowed
+
+  // 媒体渠道列（左列更窄）
+  .blog-profile--table_icon
+    width: 130px
+
+// 可滚动表格（友情链接 > LIMITS.friendScroll 行）
+.blog-profile--table_scrollable
+  thead
+    display: table
+    width: calc(100% - 5px)
+    table-layout: fixed
+
+  tbody
+    display: block
+    max-height: 210px
+    overflow-y: auto
+    scrollbar-width: thin
+    scrollbar-color: #c1c1c1 transparent
+
+    tr
+      display: table
+      width: 100%
+      table-layout: fixed
+
+    &::-webkit-scrollbar
+      width: 5px
+
+    &::-webkit-scrollbar-track
+      background: transparent
+
+    &::-webkit-scrollbar-thumb
+      background: #c1c1c1
+      border-radius: 3px
+
+// ===== 底部编辑提示文案 =====
+.blog-profile--edit_hint
+  margin-top: $theme-spacing.sm
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+  text-align: right
+
+// ===== 表单校验反馈 =====
+//   校验通过（刚失焦）：绿色边框 + 绿色文字
+//   校验失败：红色边框 + 红色文字 + 下方红色提示小字
+.blog-write--editor
+  .blog-write--input
+    transition: outline 0.15s, color 0.15s
+
+    &.input-active
+      color: var(--theme-font-sec)
+      outline: 1px solid var(--theme-font-sec)
+
+    &.input-err
+      color: var(--theme-font-danger)
+      outline: 1px solid var(--theme-font-danger)
+
+      // 后面紧邻的校验提示小字
+      & + .blog-profile--input_hint
+        display: block
+
+  // 校验提示小字（默认隐藏，仅 input 出错时显示）
+  .blog-profile--input_hint
+    display: none
+    margin-top: 2px
+    // ⚠ 原文件写的是 $theme-fz.xs，但字号表里只有 sm/base/lg/xl ——
+    //   取不存在的键会得到 null，Stylus 把整条声明丢掉（不报错）。
+    //   这里按原意取最小档 sm(14px)。
+    font-size: $theme-fz.sm
+    // 原项目直接写 red(#f00)：与整页冷调不搭，改用 element 的 danger 色
+    color: var(--theme-font-danger)
+    line-height: 1.4

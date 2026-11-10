@@ -1,0 +1,353 @@
+@import 'themes.styl'
+
+// ============================================================
+// 时间线管理页样式 —— views/Timeline.vue
+//
+// 复用：卡片壳 `.blog-write--editor`（form.styl 里归零了 header/body 内边距）、
+//       顶栏 `.blog-write--header` / `.blog-write--back`、分区标题 `.blog-form--section_title`、
+//       末行按钮 `.blog-write--actions` / `.blog-write--btn` —— 都是全局层现成的，这里不抄第二份。
+//
+// 本文件只写本页独有的三块：
+//   ① 图片预览框（整页面背景图 + 单项配图，两块同一套「点它选图 + hover 蒙版」）
+//   ② 表单控件（本页的字段是「标签在上、控件在下」的紧凑排布，
+//      与个人中心那种「色块 label 压住输入框上沿」不是一套，所以不复用 .blog-write--input）
+//   ③ 时间轴列表（条目卡片 + 容器内滚动）
+//
+// ⚠ 两个图片框的比例必须与 config/timeline.config.js 的 TIMELINE_RATIO 一致：
+//   3:2 / 16:9 与裁剪弹窗的比例同值，否则裁好的构图会被 object-fit: cover 再切一刀。
+//
+// ⚠ 声明统一写「属性: 值」带冒号形式 —— Stylus 对「无冒号 + 值是多段」有歧义，
+//   紧跟缩进更深的嵌套块时会被当成选择器解析、整条静默丢失（详见 component.styl）。
+//
+// ⚠ 选择器可以写多行列表，但**必须带逗号**：Stylus 里不带逗号的多行选择器
+//   会被编译成后代选择器（`.a .b` 而不是 `.a, .b`）。
+// ============================================================
+
+#timeline
+  // 与 #index / #column / #manage 同款：不锁高，只留底部空白
+  margin-bottom: $theme-spacing['2xl']
+
+// 选图用的隐藏 input（常驻一个复用，同 profile.styl）
+.blog-timeline--file_picker
+  display: none
+
+// ============================================================
+// ① 图片预览框
+// ============================================================
+.blog-timeline--cover_field
+  flex: 1
+  min-width: 0
+
+  // 报错那行跟着预览框的宽度（360），别让它横跨整行
+  .blog-timeline--hint
+    max-width: 360px
+
+.blog-timeline--cover
+  position: relative
+  display: flex
+  align-items: center
+  justify-content: center
+  width: 360px
+  max-width: 100%
+  aspect-ratio: 16 / 9
+  border-radius: $theme-radius.md
+  overflow: hidden
+  border: 1px solid var(--theme-border)
+  background-color: var(--theme-bgc-input)
+  cursor: pointer
+  transition: border-color 0.2s ease
+
+  img
+    position: absolute
+    top: 0
+    left: 0
+    display: block
+    width: 100%
+    height: 100%
+    object-fit: cover
+
+  // 没图时给虚线框，「这里还缺一张图」一眼可辨
+  &.is-empty
+    border: 1px dashed var(--theme-border-strong)
+
+  // 校验失败：与输入框同一个红
+  &.is-error
+    border-color: var(--theme-font-danger)
+    background-color: var(--theme-bgc-danger)
+
+// 条目里的配图缩略图：同一套，只是小一号、比例换成 3:2
+.blog-timeline--thumb
+  position: relative
+  display: flex
+  align-items: center
+  justify-content: center
+  flex: 0 0 160px
+  width: 160px
+  aspect-ratio: 3 / 2
+  border-radius: $theme-radius.md
+  overflow: hidden
+  border: 1px solid var(--theme-border)
+  background-color: var(--theme-bgc-input)
+  cursor: pointer
+  transition: border-color 0.2s ease
+
+  img
+    position: absolute
+    top: 0
+    left: 0
+    display: block
+    width: 100%
+    height: 100%
+    object-fit: cover
+
+  &.is-empty
+    border: 1px dashed var(--theme-border-strong)
+
+  &.is-error
+    border-color: var(--theme-font-danger)
+    background-color: var(--theme-bgc-danger)
+
+// 空态占位图标（没有图时显示）
+.blog-timeline--placeholder
+  color: var(--theme-font-placeholder)
+  font-size: 28px
+
+// hover 蒙版：只在编辑态出现（查看态点了也不会有上传提示）
+.blog-timeline--mask
+  position: absolute
+  top: 0
+  left: 0
+  z-index: 1
+  display: flex
+  align-items: center
+  justify-content: center
+  width: 100%
+  height: 100%
+  background: rgba(0, 0, 0, 0.35)
+  opacity: 0
+  transition: opacity 0.25s ease
+
+  i
+    font-size: 28px
+    color: #fff
+
+.blog-write--editor.is-editing .blog-timeline--cover:hover .blog-timeline--mask,
+.blog-write--editor.is-editing .blog-timeline--thumb:hover .blog-timeline--mask
+  opacity: 1
+
+// ============================================================
+// ② 表单控件（标签在上、控件在下）
+// ============================================================
+.blog-timeline--input
+  display: block
+  box-sizing: border-box
+  width: 100%
+  margin: 0
+  padding: 0 $theme-spacing.base
+  line-height: 38px
+  border: 1px solid var(--theme-border)
+  border-radius: $theme-radius.xs
+  color: var(--theme-font-light)
+  outline: none
+  // 只读态用「极浅冷底」、编辑态用白底 —— 与个人中心同一套语义
+  background-color: var(--theme-bgc-input)
+  transition: background-color 0.2s ease, border-color 0.2s ease
+
+  &::placeholder
+    color: var(--theme-font-placeholder)
+
+  &:not(:disabled)
+    background-color: var(--theme-bgc-input-edit)
+
+    &:focus
+      border-color: var(--theme-font-fst)
+
+  &:disabled
+    cursor: default
+
+  &.input-err
+    border-color: var(--theme-font-danger)
+    background-color: var(--theme-bgc-danger)
+
+.blog-timeline--textarea
+  // 行高归位：多行文本用 38px 的行高会把文字顶到中间
+  min-height: 76px
+  padding: $theme-spacing.sm $theme-spacing.base
+  line-height: 1.6
+  resize: vertical
+
+// Chrome 自带的日期选择器图标：深色模式下它是深色的，压在深底上看不见
+:root[data-theme='dark'] .blog-timeline--input[type='date']::-webkit-calendar-picker-indicator
+  filter: invert(0.75)
+
+.blog-timeline--field_label
+  display: block
+  margin-bottom: $theme-spacing.xs
+  font-size: $theme-fz.base
+  color: var(--theme-font-trd)
+
+// 提示：默认不占位（与个人中心那条 hint 同一个做法），出错才由 .is-error 亮出来
+.blog-timeline--hint
+  display: none
+  margin-top: $theme-spacing.xs
+  font-size: $theme-fz.sm
+  line-height: 1.5
+  color: var(--theme-font-trd)
+
+  &.is-error
+    display: block
+    color: var(--theme-font-danger)
+
+// ============================================================
+// ③ 时间轴列表
+// ============================================================
+.blog-timeline--section_head
+  display: flex
+  align-items: flex-end
+  justify-content: space-between
+  gap: $theme-spacing.base
+  .blog-form--section_title
+    padding-bottom 20px
+
+.blog-timeline--add
+  display: inline-flex
+  align-items: center
+  gap: $theme-spacing.sm
+  flex-shrink: 0
+  padding: $theme-spacing.sm $theme-spacing.base
+  border: none
+  border-radius: $theme-radius.md
+  background-color: var(--theme-bgc-deepBtn)
+  color: var(--theme-font-fst)
+  font-size: $theme-fz.base
+  cursor: pointer
+  transition: all 0.2s ease
+
+  &:hover
+    background-color: var(--theme-font-sec)
+    color: #fff
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.15)
+
+  &:disabled
+    background-color: var(--theme-bgc-disabledBtn)
+    color: #fff
+    cursor: not-allowed
+    box-shadow: none
+
+.blog-timeline--empty
+  margin-top: $theme-spacing.base
+  padding: $theme-spacing.xl
+  border: 1px dashed var(--theme-border-strong)
+  border-radius: $theme-radius.md
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.base
+  text-align: center
+
+// 列表本体：固定高 + 内部滚动（需求：条目没有上限，反正在容器里滚）
+.blog-timeline--list
+  display: flex
+  flex-direction: column
+  gap: $theme-spacing.base
+  margin-top: $theme-spacing.base
+  // 460 是实测出来的：约等于 1.5 张条目卡片高 —— 一眼能看见下一条的存在，
+  // 拖滚动条时也不会「一次滚过去好几条」
+  max-height: 460px
+  overflow-y: auto
+  padding-right: $theme-spacing.sm
+  scrollbar-width: thin
+  scrollbar-color: var(--theme-border-strong) transparent
+
+  &::-webkit-scrollbar
+    width: 8px
+
+  &::-webkit-scrollbar-track
+    background-color: transparent
+
+  &::-webkit-scrollbar-thumb
+    border-radius: 4px
+    background-color: var(--theme-border-strong)
+
+    &:hover
+      background-color: var(--theme-font-trd)
+
+// ── 一条记录 ────────────────────────────────────────────────
+.blog-timeline--item
+  padding: $theme-spacing.base
+  border-radius: $theme-radius.lg
+  // 淡主题底：与博客管理的条目同一档（换主题色 / 切昼夜都会跟着走）
+  background-color: var(--theme-bgc-lightBtn)
+
+.blog-timeline--item_head
+  display: flex
+  align-items: center
+  gap: $theme-spacing.base
+  margin-bottom: $theme-spacing.base
+
+.blog-timeline--item_no
+  font-size: $theme-fz.lg
+  font-weight: 700
+  color: var(--theme-font-fst)
+
+.blog-timeline--item_date
+  flex: 1
+  min-width: 0
+  font-size: $theme-fz.sm
+  letter-spacing: 1px
+  color: var(--theme-font-trd)
+
+.blog-timeline--item_remove
+  display: inline-flex
+  align-items: center
+  gap: $theme-spacing.xs
+  flex-shrink: 0
+  padding: $theme-spacing.xs $theme-spacing.base
+  border: none
+  border-radius: 999px
+  background-color: var(--theme-bgc-chip)
+  color: var(--theme-font-trd)
+  font-size: $theme-fz.sm
+  cursor: pointer
+  transition: all 0.2s ease
+
+  &:hover
+    background-color: var(--theme-font-danger)
+    color: #fff
+
+  &:disabled
+    cursor: not-allowed
+    opacity: 0.5
+
+    &:hover
+      background-color: var(--theme-bgc-chip)
+      color: var(--theme-font-trd)
+
+// ── 记录主体：左边缩略图、右边字段 ───────────────────────────
+.blog-timeline--item_body
+  display: flex
+  align-items: flex-start
+  gap: $theme-spacing.base
+
+.blog-timeline--fields
+  flex: 1
+  min-width: 0
+  display: grid
+  // 标题占满、年月日固定窄列；第三项（说明文字）由下面的 nth-child 拉通整行
+  grid-template-columns: minmax(0, 1fr) 170px
+  gap: $theme-spacing.base
+
+  // ⚠ 这一条跟着 config/timeline.config.js 的 ITEM_FIELDS 顺序走：
+  //   第 1 项是标题、第 2 项是年月日、第 3 项（说明文字）需要整行。
+  //   调整字段顺序时这里要一起改。
+  .blog-timeline--field:nth-child(3)
+    grid-column: 1 / -1
+
+.blog-timeline--field
+  min-width: 0
+
+// ── 末行左侧那条统计 ────────────────────────────────────────
+// `.blog-write--actions` 是 flex-end，靠 margin-right: auto 把它顶到最左边
+.blog-timeline--count
+  margin-right: auto
+  align-self: center
+  font-size: $theme-fz.sm
+  color: var(--theme-font-trd)

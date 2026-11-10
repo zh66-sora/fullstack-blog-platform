@@ -1,0 +1,181 @@
+// ============================================================
+// 主题设计令牌（Design Tokens）
+// ------------------------------------------------------------
+// 颜色类用 CSS 变量（--theme-*）挂载在 :root 上，
+// 便于后期通过 JS 一键切换主题色 / 深色模式。
+//
+// 一键切换主题色示例（换整套强调色）：
+//   const palettes = {
+//     blue:  { '--theme-font-fst': '#68AEF4', '--theme-font-sec': '#53A3F2',
+//              '--theme-bgc-lightBtn': '#E2F0FF', '--theme-bgc-deepBtn': '#C6E1FF',
+//              '--theme-bgc-btmBtn': '#8696F5' },
+//     green: { '--theme-font-fst': '#52C41A', '--theme-font-sec': '#73D13D',
+//              '--theme-bgc-lightBtn': '#F6FFED', '--theme-bgc-deepBtn': '#D9F7BE',
+//              '--theme-bgc-btmBtn': '#95DE64' },
+//   }
+//   function switchTheme(name) {
+//     Object.entries(palettes[name]).forEach(([k, v]) =>
+//       document.documentElement.style.setProperty(k, v))
+//   }
+//
+//   也可用 data-theme 属性 + 预定义选择器：
+//   :root[data-theme='green'] { --theme-font-fst: #52C41A; ... }
+//
+// 间距 / 圆角 / 字号 / 阴影为主题色切换无关的编译期常量，
+// 故保留为 Stylus 哈希变量。
+// ============================================================
+
+// ===== 颜色主题（运行时可变，用 var() 引用） =====
+:root
+  // ===== 强调色系 + 半透明强调色 =====
+  //
+  // ⚠ 这两组**运行时真值在 utils/themeRuntime.js**（由调色盘色相 + 当前模式算出来，
+  //   被 setProperty 写成 documentElement 的行内样式）。这里写的只是**首帧兜底**：
+  //   万一 JS 没跑起来（报错 / 被拦截），页面至少不会因为变量为空而整片失色。
+  //   所以下面的数字是「默认色相 210」照 themeRuntime 算出来的副本 ——
+  //   改了那边的 s / l，这里要跟着重算一遍（或者干脆让它们对不上：运行时以 JS 为准）。
+  //
+  //   生成办法：把色相设回 210，在控制台读
+  //     getComputedStyle(document.documentElement).getPropertyValue('--theme-font-fst')
+  //   或看 document.documentElement.style 上的行内值。
+  --theme-font-fst: #6ea3d8       // 主强调色
+  --theme-font-sec: #5694d2       // 次强调色
+  --theme-bgc-lightBtn: #e4edf6   // 浅色按钮底
+  --theme-bgc-deepBtn: #cfdff2    // 深色按钮底
+  --theme-bgc-btmBtn: #909ce0     // 备用强调色（原项目的 btmBtn，目前未被使用）
+  // 半透明强调色（柔光 / 聚焦光圈 / 渐隐线）—— 只能整串 rgba()，所以由 JS 生成
+  --theme-accent-hi: rgba(110, 163, 216, 0.42)
+  --theme-accent-mid: rgba(110, 163, 216, 0.1)
+  --theme-accent-none: rgba(110, 163, 216, 0)
+  --theme-accent-glow: rgba(110, 163, 216, 0.32)
+  --theme-accent-ring: rgba(110, 163, 216, 0.16)
+
+  // 中性色系 —— 仅深色/浅色模式才切换
+  --theme-font-trd: #7F7F7F      // 三级灰字
+  --theme-font-light: #333        // 深色文字
+  --theme-bgc-card: #fff          // 卡片底（纯中性，不带色相）
+  // 半透明卡片底：给「压在图片上」的内容面板用（目前只有时间线展示页的节点内容区）。
+  // ⚠ 它必须是**半透明**的 —— 底色下面就是用户自己传的背景图，
+  //   不透明面板会把图整块盖掉，纯透明又保不住文字对比度。
+  //   下面跟着的 [data-theme='dark'] 块里有一份同值的暗色版（= --theme-bgc-card 的 86%）
+  --theme-bgc-veil: rgba(255, 255, 255, 0.86)
+  // 禁用按钮底：冷调中性灰，明度刻意贴住主强调色 ——
+  // 实心按钮由主题色换成灰色时，视觉重量不变，不会突然「塌下去」
+  --theme-bgc-disabledBtn: #A6AEB8
+
+  // ============================================================
+  // ⚠ 下面这 4 个「浅色面」运行时由 JS 按色相派生
+  //   （页面底 / 只读输入底 / 小控件底 / 链接卡底）——
+  //   它们是页面上面积最大的一层，必须跟着主题色走，
+  //   否则换色相时只有它们还是那一成不变的淡蓝。
+  //   这里写的只是**默认色相 210 下的兜底值**，JS 一跑就被行内样式覆盖。
+  //   真值见 utils/themeRuntime.js 的 LIGHT_SURFACES / DARK_SURFACES。
+  // ============================================================
+  --theme-bgc-main: #e9f0f7        // 页面底（最淡的一档）
+  --theme-bgc-input: #eff5fa       // 只读态输入框底 / 板块选单底
+  --theme-bgc-chip: #e5edf6        // 可点的小控件底（筛选按钮…）
+  --theme-bgc-linkCard: #f2f5f8    // 链接卡片底
+
+  // 表单控件的描边
+  --theme-border: #D6E0EA          // 常规描边：输入框 / 表格 / 图片预览框
+  --theme-border-light: #E9EFF6    // 弱描边：表格行线、字段之间的分隔线
+  // 强描边：给「虚线分隔」和需要明确边界的地方用。
+  // ⚠ 虚线用弱描边会太淡（1px 的虚线本来就比实线看着轻），
+  //   所以虚线类一律走这一档。
+  --theme-border-strong: #B9C6D4
+  --theme-bgc-input-edit: #fff     // 编辑态输入框底（白底 = 可编辑，与只读态一眼可分）
+  --theme-font-placeholder: #9AA6B2 // 占位符（原来是 #999，偏暖发灰）
+  // 校验失败的红：取 element 的 danger 色，别再散写 red(#f00)
+  --theme-font-danger: #F56C6C
+  // 校验失败的底：原来 modal.styl 里写死 #FFFAFA（极浅粉）——
+  // 深色模式下那会变成一块刺眼的亮斑，所以提成变量
+  --theme-bgc-danger: #FFFAFA
+
+  // 正文里裸链的颜色（global.styl 的 `a { color }`）
+  // ⚠ 原来直接写死 #16418a（深海军蓝）—— 于是「换了主题色，文章列表里的
+  //   『评论』和板块名还是蓝的」。现在它跟另外 5 个强调色一样由 JS 按色相派生
+  //   （浅底压暗、深底提亮），这里只是默认色相下的兜底。
+  --theme-font-link: #275786
+
+// ============================================================
+// 深色模式（夜间）—— 只覆盖「中性色系」
+// ------------------------------------------------------------
+// 挂载方式：store/modules/theme.js 在 SET_MODE / 初始化时
+//   给 document.documentElement 挂 `data-theme="light|dark"`。
+//
+// ⚠ 这里**不写强调色那 5 个**（--theme-font-fst/sec、--theme-bgc-lightBtn/deepBtn/btmBtn）：
+//   它们由调色盘按「当前色相 + 当前模式」用 JS 算出来写进行内样式（见 utils/themeRuntime.js）。
+//   如果在这里也写一份，就成了两个来源，调色盘会被 CSS 覆盖掉。
+//   分工三组：
+//     **强调色（含裸链 / 柔光） → JS**（跟着色相）
+//     **浅色面（页面底 / 只读输入底 / 小控件底 / 链接卡底） → JS**（也跟着色相，见 LIGHT_SURFACES）
+//     **其余中性色（文字 / 描边 / 卡片底 / 禁用底） → CSS（本文件）**
+//
+// ⚠ 亮暗关系别搞反：--theme-bgc-main 是**页面底**、--theme-bgc-card 是**卡片底**。
+//   浅色下 main 比 card 深一点点；深色下同理 ——
+//   main 要比 card 更暗，卡片才会「浮」在页面上（反过来的话卡片看起来是凹陷的）。
+//   这条关系由 LIGHT_SURFACES / DARK_SURFACES 的明度保证（浅色 94 vs 卡片 100，深色 10 vs 卡片 ~14）。
+// ============================================================
+:root[data-theme='dark']
+  // 文字：主文字提亮到近白，三级灰保持「比主文字弱一档」但在深底上仍够读
+  --theme-font-light: #E3E8EE
+  --theme-font-trd: #98A2AE
+
+  // 卡片底：纯中性，留在 CSS 里
+  --theme-bgc-card: #1E232A
+  // 半透明卡片底（= 上面那档卡片底 #1E232A 的 86%）：压在图片上的内容面板
+  --theme-bgc-veil: rgba(30, 35, 42, 0.86)
+
+  // 禁用按钮：深色下不能用中灰（会亮得扎眼），压到比卡片略亮即可
+  --theme-bgc-disabledBtn: #5A6470
+
+  // 描边：深色下描边要「比底亮一档」才看得出来
+  --theme-border: #39424C
+  --theme-border-light: #2C333C
+  --theme-border-strong: #4C5763
+
+  --theme-bgc-input-edit: #1A1F26
+  --theme-font-placeholder: #6E7885
+
+  // 校验红：深底上要提亮一点，否则发暗看不清
+  --theme-font-danger: #F78989
+  // 校验失败的底：深色下用「暗红」，与浅色那套的语义一致（一眼看出是错误态）
+  --theme-bgc-danger: #3A2224
+
+  // ⚠ 这里**不写**这 5 个：
+  //   --theme-font-link / --theme-bgc-main / --theme-bgc-input / --theme-bgc-chip / --theme-bgc-linkCard
+  //   它们深浅两套都由 JS 按色相派生（见文件顶部 :root 的说明）。
+  //   在深色块里再写一份，就变成「换主题色时深色下这几个不跟随」。
+
+// ===== 间距 =====
+$theme-spacing = {
+  xs: 4px,
+  sm: 8px,
+  base: 12px,
+  lg: 24px,
+  xl: 32px,
+  '2xl': 48px
+}
+
+// ===== 圆角 =====
+$theme-radius = {
+  xxs: 2px,
+  xs: 6px,
+  md: 12px,
+  lg: 16px
+}
+
+// ===== 字号 =====
+$theme-fz = {
+  sm: 14px,
+  base: 16px,
+  lg: 20px,
+  xl: 28px
+}
+
+// ===== 阴影 =====
+$theme-shadows = {
+  sm: 0 1px 2px rgba(0, 0, 0, 0.05),
+  base: 0 1px 3px rgba(0, 0, 0, 0.1),
+  lg: 8px 8px 20px rgba(100, 100, 100, 0.15)
+}

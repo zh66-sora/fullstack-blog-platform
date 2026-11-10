@@ -1,0 +1,424 @@
+@import 'themes.styl'
+
+// ============================================================
+// 通用组件类（迁移自原项目 src/styl/component.styl）
+// 被 Aside、文章列表卡片、文章详情页共用，所以放在全局而不是某个组件的 style 里
+//
+// ⚠ 本文件所有声明统一写成「属性: 值」的带冒号形式。
+// Stylus 对「无冒号 + 值是多段」的声明有歧义：如果紧跟其后的是一个
+// 缩进更深的嵌套块（如 &::before），该声明会被当成选择器解析，
+// 整条规则被静默丢弃（编译不报错，CSS 里出现 `xx box-shadow $var` 这种选择器）。
+// ============================================================
+
+// ===== 卡片外壳 =====
+// 由 el-card 承载，视觉还原原项目 .blog-card：
+// padding 24px / radius 16px / 白底 / 8px 8px 20px 阴影
+//
+// ⚠⚠ 选择器写成 `.el-card.blog-card`，不能只写 `.blog-card`。
+//   element 自带的 `.el-card` 是
+//     { border: 1px solid #EBEEF5; border-radius: 4px; overflow: hidden }
+//   权重同为 (0,1,0) —— 只写 `.blog-card` 的话，谁赢完全取决于「谁后注入」：
+//   正常是 component.styl 后注入能压住它，但组件样式被 HMR 重新插到末尾、
+//   或者引入顺序调整过之后，就会被 element 反超 —— 表现为卡片多出一圈灰边框、
+//   没有阴影、阴影被 overflow:hidden 裁掉，即「.blog-card 这个样式不起效」。
+//   提到 (0,2,0) 之后与注入顺序无关，永久生效。
+//
+// el-card 的标准结构是「header + body」两段，分别由 .el-card__header /
+// .el-card__body 两个 div 承载，原 .blog-card 的 padding: 24px 要按情况拆：
+//   有 header 插槽 → 头部 24 24 0 + 身部 0 24 24，合计仍是 24px
+//   没有 header     → 身部自己 24px 四周
+// 两条规则一起写，.blog-card 单用（不带 header）时也是完整的内边距。
+.el-card.blog-card
+  position: relative
+  // 描边：卡片底（白）与页面底（--theme-bgc-main 那层极浅的主题色）只差一档明度，
+  // 单靠明度差看着不明显 —— 补一圈描边，与分页器同一套写法
+  // （.blog-pager 也是「卡片底 + 1px var(--theme-border)」），两处在页面上也就统一了
+  border: 1px solid var(--theme-border)
+  border-radius: $theme-radius.lg
+  background-color: var(--theme-bgc-card)
+  box-shadow: $theme-shadows.lg
+  // el-card 默认 overflow: hidden，会把卡片阴影裁掉
+  overflow: visible
+
+  .el-card__header
+    padding: $theme-spacing.lg $theme-spacing.lg 0
+    // el-card 默认给 header 加下边框，原项目没有
+    border-bottom: none
+
+  // 默认四周 24px —— 没有 header 插槽的卡片靠这条
+  .el-card__body
+    padding: $theme-spacing.lg
+
+  // 紧跟在 header 之后的 body：顶部距离已经由 header 提供了，不要再叠一次 24px
+  .el-card__header + .el-card__body
+    padding-top: 0
+
+// ===== 卡片头部：左侧竖条 + 标题 =====
+// 结构照搬 modal 的 head（assets/css/modal.styl）：
+//   容器 padding-bottom 给细线留位置 → 竖条用 bottom 让开这段 padding，
+//   于是竖条只覆盖标题那一行，不会顺着整行一起拉长、也不会和细线接在一起
+.blog-card--header
+  position: relative
+  padding-left: 10px
+  padding-bottom: $theme-spacing.base
+
+  &::before
+    position: absolute
+    height: 40%
+    left: 0
+    top: 18%
+    bottom: $theme-spacing.base
+    content: ''
+    width: 4px
+    border-radius: $theme-radius.xxs
+    background-color: var(--theme-font-fst)
+
+  // 标题下沿的渐隐细线：左浓右隐，与左侧竖条凑成一套（同款见
+  // assets/css/modal.styl 的 .blog-modal--element .blog-modal--head::after）
+  // 位置在 padding 区里（bottom: 0），所以和文字、竖条之间都留出间距
+  &::after
+    position: absolute
+    left: 0
+    right: 0
+    bottom: 0
+    height: 1px
+    content: ''
+    background: linear-gradient(to right, var(--theme-accent-hi) 0%, var(--theme-accent-mid) 62%, var(--theme-accent-none) 100%)
+
+  h3
+    text-align: left
+    font-weight: 700
+
+// ============================================================
+// 通用按钮（迁移自原项目 modal.styl 里那两级按钮）
+//   实心主按钮 .blog-btn--submit —— 提交 / 确定
+//   幽灵次按钮 .blog-btn--ghost  —— 取消 / 切换
+// 原来是「只属于登录弹窗」的写法（.blog-modal--foot .el-button），
+// 现在评论区、确认弹窗都要用，所以提到这里做成全局。
+//
+// ⚠ 权重 (0,2,0)：element 自带的 .el-button / .el-button--small 都是 (0,1,0)，
+//   提权后与样式注入顺序无关。
+// ============================================================
+.el-button.blog-btn--submit,
+.el-button.blog-btn--ghost
+  margin: 0
+  padding: 9px 18px
+  height: auto
+  line-height: 1.5
+  font-size: $theme-fz.base
+  border: 1px solid var(--theme-font-fst)
+  border-radius: $theme-radius.xs
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease
+
+.el-button.blog-btn--submit
+  background-color: var(--theme-font-fst)
+  color: #fff
+  // 柔光用随主题派生的变量（原来是写死的 rgba(104,174,244,·)，
+  // 换了色相之后按钮变绿、光还是蓝的）
+  box-shadow: 0 6px 16px var(--theme-accent-glow)
+
+  &:hover,
+  &:focus
+    background-color: var(--theme-font-sec)
+    border-color: var(--theme-font-sec)
+    color: #fff
+
+.el-button.blog-btn--ghost
+  background-color: transparent
+  color: var(--theme-font-fst)
+
+  &:hover,
+  &:focus
+    background-color: var(--theme-bgc-lightBtn)
+    border-color: var(--theme-font-fst)
+    color: var(--theme-font-fst)
+
+// ============================================================
+// 赞 / 踩 操作条（HabitBar.vue —— 博客文章 / 评论区 / 文章列表共用）
+// ============================================================
+.blog-habit--bar
+  display: flex
+  align-items: center
+  gap: $theme-spacing.base
+
+// 图标 + 文字 + 计数的文字型按钮：没有边框底色，靠 hover 反馈
+// ⚠ 权重 (0,3,0)：要压过上面 (0,2,0) 的通用按钮和 element 的 (0,1,0)
+//
+// 三个尺寸都写成「var(--habit-*) + 旧值兜底」：
+//   文章列表卡片 / 详情页底部会在各自的容器上声明 --habit-*（见下面「元信息条目」小节），
+//   评论区两个容器都不在，就落回兜底值 —— 评论区的观感因此完全不变。
+.blog-habit--bar .el-button.blog-habit--btn
+  margin: 0
+  padding: 0
+  height: auto
+  line-height: 1.5
+  font-size: var(--habit-text, $theme-fz.sm)
+  border: none
+  border-radius: $theme-radius.xs
+  background-color: transparent
+  color: var(--theme-font-trd)
+  display: inline-flex
+  align-items: center
+  // icon / 文字 / 数字 三者之间的间距（原来写死 2px，现在是 token）
+  gap: var(--habit-gap, 2px)
+
+  // ⚠ element 的 el-button 会把插槽内容再包一层 <span>：
+  //      button > span > [i, label, cnt]
+  //   所以间距要打在里层 span 上，打在 button 上只会作用到那个 span（单一子项）。
+  //   而 SFC 模板经 whitespace: 'condense' 编译后元素之间的空白会被删掉，
+  //   不给这层 gap 就是「图标文字数字全贴在一起」。
+  > span
+    display: inline-flex
+    align-items: center
+    gap: var(--habit-gap, 2px)
+
+  i
+    font-size: var(--habit-icon, 15px)
+    line-height: 1
+
+  &:hover,
+  &:focus
+    background-color: transparent
+    color: var(--theme-font-fst)
+
+  // 已赞 / 已踩：图标点亮成主色
+  &.is-active
+    color: var(--theme-font-fst)
+
+// ============================================================
+// 文章元信息条目：赞 / 踩 / 评论 / 浏览
+//
+// 一条的形态统一为 [icon] [文字] [数字]，用到两处：
+//   列表卡片   .blog-btn--actions        —— 赞 / 评论 / 浏览
+//   详情页底部 .blog-article--actions    —— 赞 / 踩 / 评论
+//
+// 四个元素的尺寸与间距**全部**由三个 token 决定，改尺寸只改这两组 token：
+//   --habit-icon  图标字号 —— 赞/踩的图标也走它，不会再比评论的小
+//   --habit-text  文字与数字字号 —— 两者同档，不再一个 16 一个 14
+//   --habit-gap   icon / 文字 / 数字之间的间距 —— 数字不再贴着文字
+//
+// 两个档位（详情页的图标本来就大一号），间距两处同为 6px：
+//   列表卡片   16 / 14 / 6
+//   详情页底部 22 / 16 / 6
+// ============================================================
+.blog-btn--actions
+  --habit-icon: 16px
+  --habit-text: $theme-fz.sm
+  --habit-gap: 6px
+
+.blog-article--actions
+  --habit-icon: 22px
+  --habit-text: $theme-fz.base
+  --habit-gap: 6px
+
+// 条目容器：横向排列 + 统一间距
+//   卡片里一项是 .blog-btn--habit（内部 [内容] + [数字]）
+//   内容的两种写法都要覆盖：评论是 <a> 里放图标+文字，浏览是把图标+文字直接放在 .habit-info 上
+//   —— 只写 .habit-info a 会把「浏览」整个漏掉（图标没放大、间距也归零）
+//   详情页里评论一项是 .blog-article--action_item，赞/踩是 HabitBar
+.blog-btn--actions .blog-btn--habit,
+.blog-btn--actions .blog-habit--bar,
+.blog-btn--actions .habit-info,
+.blog-btn--actions .habit-info a,
+.blog-article--actions .blog-article--action_item,
+.blog-article--actions .blog-habit--bar
+  display: inline-flex
+  align-items: center
+  gap: var(--habit-gap)
+  line-height: 1
+
+// HabitBar（赞 / 踩）在这两行里也跟着走同一套行高：
+// 默认那条是 line-height: 1.5（评论区在用），会让赞/踩的文字盒子比评论/浏览高一截，
+// 一行里几个条目的垂直位置就对不齐了
+.blog-btn--actions .blog-habit--bar .el-button.blog-habit--btn,
+.blog-article--actions .blog-habit--bar .el-button.blog-habit--btn
+  line-height: 1
+
+// 图标：四处同尺寸
+// ⚠ 只打到 i 上 —— 卡片的容器里既有图标也有文字，给容器加 font-size 会把文字也放大
+.blog-btn--actions .habit-info i,
+.blog-btn--actions .blog-habit--btn i,
+.blog-article--actions .blog-article--action_item i,
+.blog-article--actions .blog-habit--btn i
+  font-size: var(--habit-icon)
+  line-height: 1
+
+// 文字与数字：同字号（设置在外层容器上，内部的文字/数字一起继承）
+.blog-btn--actions .blog-btn--habit,
+.blog-article--actions .blog-article--action_item,
+.blog-article--actions .blog-habit--bar
+  font-size: var(--habit-text)
+
+// ============================================================
+// 文章信息行 / 标签 chips —— 列表卡片与详情页共用
+// 迁移自原项目 src/styl/article.styl 的 .blog-article--info 与 .blog-article--tags
+// ============================================================
+
+// 发表者：头像 + 昵称 → 进 TA 的主页（他人主页的入口之一）
+//
+// 单独一行放在信息行**上面**：信息行是 4 个「图标 + 文字」的格子，
+// 塞不进头像（格子高 30px、且是 grid 布局），硬塞进去会把四列挤乱。
+// 这里的下间距与信息行自己的 padding-top(15px) 叠出来是「作者」与「日期板块」之间的留白。
+.blog-article--author
+  display: inline-flex
+  max-width: 100%
+  margin: $theme-spacing.sm 0 0
+
+// 信息行：发布日 / 板块 / 字数 / 更新日
+//
+// 用「固定列数」而不是原来的 flex 自适应宽度：四项的宽度会随内容长短变化
+// （日期长、板块名长短不一），导致换行结果在 3+1 / 4 / 2+2 之间随机。
+// 改成 grid 固定列数后只有两种结果 ——
+//   宽屏（≥1200px，卡片够宽）→ 一行四个
+//   其余情况（含 xs）        → 两行、每行两个
+// 两个使用方的差异在各自页面里覆盖：
+//   列表页的封面卡片更窄 → 恒两列（Index.vue）
+//   详情页卡片宽度固定   → 恒四列（Article.vue）
+.blog-article--info
+  display: grid
+  grid-template-columns: repeat(2, minmax(0, 1fr))
+  column-gap: $theme-spacing.base
+  row-gap: $theme-spacing.base
+  padding: 15px 0
+
+  .blog-article--info_item
+    display: flex
+    // min-width:0 允许列被压缩，内容更长时也不会把列顶宽
+    min-width: 0
+    line-height: 30px
+    height: 30px
+
+    // 原项目这里写的是 justify-content: bottom —— 不是合法值，
+    // 浏览器会忽略、回落到默认的 flex-start，所以这里直接不写。
+
+    span
+      margin-right: $theme-spacing.sm
+      padding: 0 $theme-spacing.xs
+      // 窄屏（xs 下 info 是两列，每列约 141px）刚好卡住 "2026-07-20"
+      // 这种 10 字符日期，不加这句会在破折号处折成「2026-07-」/「20」两行
+      white-space: nowrap
+
+    a
+      display: block
+      height: 100%
+      border-radius: $theme-radius.xs
+
+      &:hover
+        color: var(--theme-font-sec)
+        background-color: var(--theme-bgc-lightBtn)
+
+// 宽屏：卡片宽度足够放下四项内容，排成一行四个
+// （阈值取 Element 的 lg。低于它时列表页正文列被 aside 压窄，四个会挤在一起）
+@media only screen and (min-width: 1200px)
+  .blog-article--info
+    grid-template-columns: repeat(4, minmax(0, 1fr))
+
+// 信息行 / 标签行的图标方块
+.blog-article--info i,
+.blog-article--tags i
+  width: 30px
+  height: 30px
+  font-size: $theme-fz.lg
+  // iconfont.css 的 .iconfont 只设了 font-size，没有 line-height，
+  // 30px 的盒子里字形会贴着上边 —— 补上与盒高相同的行高做垂直居中
+  // （info 行看起来正常，是因为 .blog-article--info_item 的 line-height:30px 被继承了）
+  line-height: 30px
+  background-color: var(--theme-bgc-lightBtn)
+  margin-right: $theme-spacing.sm
+  text-align: center
+  border-radius: $theme-radius.xs
+
+// 标签 chips
+.blog-article--tags
+  display: flex
+  flex-wrap: wrap
+  align-items: center
+  gap: $theme-spacing.sm
+  padding-bottom: 14px
+
+.blog-tag--chip_display
+  display: inline-flex
+  align-items: center
+  padding: 4px 10px
+  border-radius: 0
+  background: linear-gradient(to right, var(--theme-font-fst), var(--theme-bgc-deepBtn))
+  color: #fff
+  font-size: $theme-fz.sm
+  line-height: 1.5
+  text-decoration: none
+  cursor: pointer
+
+// ============================================================
+// 「条目行」列表 —— [名称] —— [图标方块] 两端对齐
+// （迁移自 myBlog index.styl 142-166 行）
+//
+// ⚠ 原来这两段写在 Aside.vue 的 <style> 里。Aside 的 style 没有 scoped，
+//   所以它们本来就是全局的；随着「页面导航卡」「友情链接」陆续被汉堡菜单复用，
+//   留在 Aside 里会变成「靠别人恰好没 scoped 才生效」的隐性依赖 —— 挪到这里显式共享。
+// 使用方：Aside.vue 的导航/扩展卡片、components/aside/FriendLinks.vue
+// ============================================================
+.blog-cards--category
+  display: grid
+  grid-template-columns: 1fr
+  gap: 5px
+
+  li
+    display: flex
+    justify-content: space-between
+    border-radius: $theme-radius.xs
+    line-height: 32px
+    padding: $theme-spacing.xs $theme-spacing.base
+    cursor: pointer
+
+    .category-name
+      // 名称贴左（宿主容器常是 text-align: center，不写会跟着居中）
+      text-align: left
+      // 超长名称（板块名 / 友情链接站点名）不撑破卡片
+      min-width: 0
+      overflow-wrap: break-word
+
+    // 图标方块：32×32 与行高等高，字形垂直居中靠 li 继承下来的 line-height
+    .category-cnt
+      flex: 0 0 32px
+      width: 32px
+      height: 32px
+      text-align: center
+      border-radius: $theme-radius.xs
+      background-color: var(--theme-bgc-deepBtn)
+      color: var(--theme-font-sec)
+
+    &:hover
+      color: var(--theme-font-fst)
+      background-color: var(--theme-bgc-deepBtn)
+
+    // 选中态：当前路由就在这一项上
+    // 原项目是点击时手动改行内样式（color:#68AEF4 + 加粗），这里由路由决定
+    &.is-active
+      color: var(--theme-font-fst)
+      font-weight: 700
+
+// 退出登录图标稍大（原项目为 /info 页面导航态预留）
+.blog-aside--logout .category-cnt
+  font-size: 20px
+
+// ===== 友情链接列表的「更多」行 =====
+// 与普通行不同：不要 [名称 | 图标] 的两端对齐，而是一条横贯整行的提示条
+// 颜色仍走主题色（浅底 + 主色字），点一次展开全部链接后该行由 v-if 移除
+.blog-cards--category .blog-friends--more
+  display: block
+  text-align: center
+  color: var(--theme-font-fst)
+  background-color: var(--theme-bgc-lightBtn)
+
+  &:hover
+    background-color: var(--theme-bgc-deepBtn)
+
+// ===== 搜索关键词高亮（摘要 / 标题里的 <mark>）=====
+// 后端返回的是「已转义的纯文本 + <mark>」，前端只负责配色。
+// 不用浏览器默认的黄底黑字：深色模式下会是一块刺眼的亮黄，和整体冷灰蓝调不搭。
+mark
+  padding: 0 2px
+  border-radius: 3px
+  background: var(--theme-accent-hi)
+  color: inherit
+  font-weight: 600

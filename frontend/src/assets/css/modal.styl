@@ -1,0 +1,542 @@
+@import 'themes.styl'
+
+// ============================================================
+// 登录 / 注册模态框
+//   结构：myBlog/src/template/modal.hbs
+//   视觉基线：myBlog/src/styl/modal.styl
+//
+// 容器是 el-dialog，文件分段：
+//   ① el-dialog 削成「纯容器」
+//   ② 卡片本体 + 尺寸变量 —— 一处改、整套等比缩放
+//   ③ 图片滑块（玻璃质感）
+//   ④ 单块面板：头部 / 表单区 / 按钮区 三段分区
+//   ⑤ 表单控件：el-input 与报错文案
+//   ⑥ 切换动效：transition 只在「点了切换」那一下挂
+//   ⑦ 响应式 ≤768px：滑块隐藏、两块面板 3D 翻转
+//
+// ⚠ 所有声明统一写成「属性: 值」的带冒号形式。
+//   Stylus 对「无冒号 + 值是多段」的声明有歧义，紧跟缩进更深的嵌套块时会被当成
+//   选择器解析、整条静默丢失（详见 component.styl 顶部说明）。
+//
+// ⚠ 配色只用 themes.styl 里的 --theme-* 变量，不引新色系；下面出现的
+//   rgba(104,174,244,…) 是 --theme-font-fst(#68AEF4)、
+//   rgba(52,90,140,…) 是 --theme-font-light(#333) 偏蓝的投影色、
+//   rgba(234,239,245,…) 是 --theme-bgc-main(#EAEFF5)。
+// ============================================================
+
+// ===== ① el-dialog 削成纯容器 =====
+.blog-modal--dialog
+  // 默认是 margin-top: 15vh（由 top 属性给），这里改成视口居中
+  position: fixed
+  top: 50%
+  left: 50%
+  margin: 0
+  transform: translate(-50%, -50%)
+  // 白底 / 圆角 / 阴影都由卡片本体（.blog-modal--wrap）提供，dialog 这层要清干净
+  background: transparent
+  box-shadow: none
+  border-radius: 0
+
+  // 默认内边距在 __body / __footer / __header 上，全部归零，留白交给卡片自己
+  // （__header 即使不传 title 也始终会渲染，所以这条不能省）
+  .el-dialog__body
+    padding: 0
+
+  .el-dialog__footer
+    padding: 0
+
+  .el-dialog__header
+    padding: 0
+
+// ===== ② 卡片本体 =====
+.blog-modal--wrap
+  position: relative
+  // 「单块面板」的宽度 —— 下面所有尺寸都从它派生：
+  //   卡片宽 = 2×、表单容器宽 = 3×、滑块位移 = 1×
+  // 所以想整体放大/缩小，改这一个值就够了。
+  //
+  // clamp(下限, 跟随视口, 上限)：
+  //   下限 300px —— 移动端布局要的是固定 300px（≤768 时 30vw 远小于 300，被下限兜住），
+  //                 所以小屏尺寸一点没动。
+  //   上限 480px —— 卡片最宽 960px。大屏上「宽而不高」，观感更扁（原来是 400，卡片 800）。
+  //   中间斜率 30vw —— 1154px 以下仍是 300；往上连续长大，不会出现跳变。
+  // 实测卡片宽度：≤1154 → 600、1440 → 864、1600 及以上 → 960。
+  --modal-panel: clamp(300px, 30vw, 480px)
+  width: calc(var(--modal-panel) * 2)
+  padding: 0
+  // 滑动的图片和错位的表单容器都会被这个裁掉，是滑块切换能成立的前提
+  overflow: hidden
+  // ⚠ 这里不能只挂 .blog-card 就完事 —— 新项目的 .blog-card 选择器是
+  //   `.el-card.blog-card`，要求元素同时带 el-card 类才生效；而 wrap 是个普通 div
+  //   （真套 el-card 会多包一层 .el-card__body 影响布局），所以卡片视觉在这里显式写一遍
+  border-radius: $theme-radius.lg
+  background-color: var(--theme-bgc-card)
+  // 阴影换成「大而柔 + 一点冷调投影」，比原来那层 8px 8px 20px 更像浮起来的卡片
+  box-shadow: 0 24px 60px rgba(52, 90, 140, 0.24), 0 2px 8px rgba(52, 90, 140, 0.08)
+
+// ===== ③ 图片滑块（玻璃质感）=====
+// ⚠ 这里故意不写 transition —— 见 ⑥
+.blog-modal--picSlider
+  position: absolute
+  top: 0
+  left: 0
+  width: 50%
+  height: 100%
+  overflow: hidden
+  // 只在外侧两角跟随卡片圆角（原来四角都圆，与表单交界处会露出一个缺口）
+  border-radius: $theme-radius.lg 0 0 $theme-radius.lg
+  // 玻璃边缘：只用 inset 阴影画，**不要用 border**。
+  // ⚠ 之前写的是 `border-left: 1px solid transparent; border-right: 1px solid ...`，
+  //   而全局 reset 给元素设了 box-sizing: border-box —— border 算在盒子内部，
+  //   于是透明的那一侧（登录态在左、注册态在右）会空出 1px，露出底下卡片的白底，
+  //   看起来就是「图片离模态框边缘还差 1px」。inset 阴影只画在图片上方，不占尺寸。
+  // 常态只有右侧（朝向表单那一侧）一条亮线，滑动后换到左侧。
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.55)
+
+  img
+    display: block
+    width: 100%
+    height: 100%
+    // 原项目没写 object-fit，图片会被拉伸；补上让它按比例裁切
+    object-fit: cover
+
+  // 玻璃遮罩：左上柔光 → 右下轻微压暗，照片看起来像「压在玻璃下面」
+  // 绝对定位铺满，不占尺寸
+  &::after
+    position: absolute
+    left: 0
+    top: 0
+    width: 100%
+    height: 100%
+    content: ''
+    pointer-events: none
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.05) 44%, rgba(26, 52, 86, 0.26) 100%)
+
+  // 滑到右半边后，圆角换到右侧，亮线也换到左侧
+  &.switchPic
+    border-radius: 0 $theme-radius.lg $theme-radius.lg 0
+    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.55)
+
+// 表单容器：3×面板宽，默认左移 1×面板宽，让 2×面板宽的可见区正好落在登录面板上
+// ⚠ 同样不写 transition，理由见 ⑥
+.blog-modal--container
+  display: flex
+  justify-content: space-between
+  width: calc(var(--modal-panel) * 3)
+  border-radius: $theme-radius.lg
+  transform: translateX(calc(var(--modal-panel) * -1))
+
+// ===== ④ 单块面板（登录 / 注册各一块，宽 1×面板宽）=====
+// 三段式：头部（标题 + 关闭） / 表单区（淡色底） / 按钮区
+.blog-modal--element
+  width: var(--modal-panel)
+  // 内边距跟着视口走：小屏 14px、大屏 24px
+  padding: clamp(14px, 1.6vw, 24px)
+  display: grid
+  gap: 20px
+  box-sizing: border-box
+  // 两块面板被外层 flex 拉成等高（以字段多的注册为准），于是登录那块会多出
+  // 一个字段的高度。grid 的 align-content 默认是 stretch，会把多出来的高度
+  // 平摊给「头 / 表单 / 按钮」三行 —— 输入框被拉高、底部按钮变成细高条。
+  // 改成 space-between：多余空间只落在行与行之间，每块内容保持自身高度。
+  align-content: space-between
+
+  // ---- 头部：竖条 + 标题 + 关闭按钮 ----
+  .blog-modal--head
+    position: relative
+    display: flex
+    justify-content: space-between
+    align-items: center
+    padding-left: 14px
+    padding-bottom: 14px
+
+    h4
+      font-size: $theme-fz.lg * 1.1
+      font-weight: 700
+      letter-spacing: 0.5px
+      color: var(--theme-font-light)
+
+    // 左侧竖条：主题色渐变，两端收圆（只覆盖标题那一行，所以 bottom 让开 padding）
+    &::before
+      position: absolute
+      left: 0
+      top: 0
+      bottom: 14px
+      content: ''
+      width: 4px
+      border-radius: 999px
+      background: linear-gradient(to bottom, var(--theme-font-fst), var(--theme-font-sec))
+
+    // 头部与表单之间的分区线：左浓右隐的渐隐细线（和 GitHub 卡片同一套语言）
+    &::after
+      position: absolute
+      left: 0
+      right: 0
+      bottom: 0
+      height: 1px
+      content: ''
+      background: linear-gradient(to right, var(--theme-accent-hi) 0%, var(--theme-accent-mid) 62%, var(--theme-accent-none) 100%)
+
+  // ---- 表单区：淡色底 + 圆角，把「填写区」和头尾分开 ----
+  // 底部留 24px 而不是 14px：报错文案是绝对定位的，最后一条会落到最后一个
+  // 输入框下方，底部不多留就跑到淡色区外面去了
+  .blog-modal--content
+    padding: 14px 14px 26px
+    border-radius: $theme-radius.md
+    // 淡色表单区：原来写死 rgba(234,239,245,.55)（= 浅色页面底 #EAEFF5 的半透明版），
+    // 深色下会变成一块亮玻璃。改成从 --theme-bgc-main 现混 —— 半透明保留，
+    // 颜色跟着主题走（含色相）。先写不透明值兜底，不支持 color-mix 的浏览器就用它
+    background-color: var(--theme-bgc-main)
+    background-color: unquote("color-mix(in srgb, var(--theme-bgc-main) 70%, transparent)")
+    // 描边：表单区的底与弹窗底（卡片底）只差一档明度，纯靠明度分不出来 ——
+    // 加一圈描边，和分页器 / 卡片同一套语言
+    border: 1px solid var(--theme-border)
+
+// 关闭按钮（面板右上角）：圆形按钮 + 图标，hover 填主题色并转 90°
+.blog-modal--close
+  display: flex
+  align-items: center
+  justify-content: center
+  flex-shrink: 0
+  width: 30px
+  height: 30px
+  border-radius: 50%
+  color: var(--theme-font-trd)
+  font-size: 16px
+  // 常态给一层极淡的底，让它一眼能看出「这里是个按钮」而不是一个 ×
+  background-color: rgba(52, 90, 140, 0.06)
+  cursor: pointer
+  user-select: none
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease
+
+  &:hover
+    color: #fff
+    background-color: var(--theme-font-fst)
+    // 不用 rotate：icon-guanbi 是左右对称的 ×，转 90° 肉眼看不出变化，改成轻微放大
+    transform: scale(1.08)
+
+// ---- 按钮区 ----
+// 两级按钮：
+//   常态（切换 登录/注册）= 幽灵按钮（透明底 + 主题色描边）
+//   .blog-btn--submit（提交/注册）= 实心主题色主按钮
+.blog-modal--foot
+  display: flex
+  // 按钮保持自身高度，不被行高拉伸（配合 .blog-modal--element 的 space-between）
+  align-items: center
+  // 右对齐。原来靠 padding-left: 140px 写死，面板一变宽就错位
+  justify-content: flex-end
+  gap: $theme-spacing.base
+
+  .el-button
+    margin: 0
+    padding: 9px 18px
+    height: auto
+    line-height: 1.5
+    font-size: $theme-fz.base
+    border: 1px solid var(--theme-accent-hi)
+    border-radius: $theme-radius.xs
+    background-color: transparent
+    color: var(--theme-font-fst)
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease
+
+    &:hover,
+    &:focus
+      background-color: var(--theme-bgc-lightBtn)
+      border-color: var(--theme-font-fst)
+      color: var(--theme-font-fst)
+
+    &:active
+      transform: translateY(1px)
+
+    // 主按钮：填主题强调色 + 白字，和页面上标题竖条 / 激活导航同一个色
+    &.blog-btn--submit
+      border-color: var(--theme-font-fst)
+      background-color: var(--theme-font-fst)
+      color: #fff
+      box-shadow: 0 6px 16px var(--theme-accent-glow)
+
+      &:hover,
+      &:focus
+        background-color: var(--theme-font-sec)
+        border-color: var(--theme-font-sec)
+        color: #fff
+
+// ===== ⑤ 表单控件 =====
+.blog-modal--element
+  // el-form-item 默认有 label 和下边距；原项目只用 placeholder，间距交给 grid gap
+  .el-form-item
+    margin-bottom: 0
+    // ⚠ 必须有：element 的报错文案是 position: absolute; top: 100%; left: 0，
+    //   而 .el-form-item 本身没有定位 —— 不加这句，它的包含块会一路找到
+    //   .blog-modal--wrap(position: relative)，报错文字被定位到卡片外面、
+    //   又被 wrap 的 overflow: hidden 裁掉，等于「校验错了但看不到提示」。
+    position: relative
+
+  .el-form-item__label
+    display: none
+
+  // 字段之间的间距（对应原项目 .blog-modal--form 的 grid gap）
+  // 取 30px 而不是 20px：报错文案是绝对定位的，从输入框正下方开始往下铺
+  // （实测高度约 20.8px = padding-top 4 + 12px 文字 ×1.4 行高）。
+  // 间距只有 20px 时，报错底边会比下一个输入框的顶边还低 3px —— 就是「挨着」的观感。
+  // 30px 留出约 9px 的净空，且不会因为错误出现/消失而改变卡片高度（不跳动）。
+  .el-form
+    display: grid
+    gap: 30px
+
+  .el-input__inner
+    width: 100%
+    height: 44px
+    line-height: 44px
+    padding: 0 $theme-spacing.base
+    font-size: $theme-fz.base
+    color: var(--theme-font-light)
+    // 输入框改成「白底 + 细描边」（原来是与页面底同色的 #EAEFF5），
+    // 压在上面那层淡色表单区上才有「一格一格待填写」的感觉
+    // ⚠ 用编辑态输入框 token 而不是写死 #fff —— 深色下白底会直接瞎掉
+    background-color: var(--theme-bgc-input-edit)
+    border: 1px solid var(--theme-border)
+    // ⚠ 必须用 unquote() 包起来：Stylus 会把裸的 `in` 当成它自己的运算符解析，
+    //   导致整个文件 ParseError（实测踩过）
+    border: 1px solid unquote("color-mix(in srgb, var(--theme-font-fst) 20%, transparent)")
+    border-radius: $theme-radius.md
+    box-shadow: inset 0 1px 2px rgba(52, 90, 140, 0.05)
+    // placeholder 比正文小一档；窄屏放不下时用省略号收尾（而不是硬生生切断）
+    text-overflow: ellipsis
+    transition: border-color 0.2s ease, box-shadow 0.2s ease
+
+    &::placeholder
+      // 13px 而不是 14px：最长的占位符「密码: 8-12位 最少包含一位(数字/大小写字母)」
+      // 在 14px 下约 277px，而 1440 屏输入框的可用宽度只有 ≈276px —— 刚好宽出一点点，
+      // 会显示成省略号。13px 下约 257px，留出余量。
+      font-size: 13px
+      color: var(--theme-font-placeholder)
+
+    &:hover
+      border-color: var(--theme-accent-hi)
+
+    // 聚焦：主题色描边 + 一圈柔光（替代原来那条 outline）
+    &:focus
+      outline: none
+      border-color: var(--theme-font-fst)
+      box-shadow: 0 0 0 3px var(--theme-accent-ring)
+
+  // 校验失败：红描边 + 淡红底 + 柔光
+  // ⚠ 原来三个色值都写死（#F56C6C / #FFFAFA / rgba(245,108,108,…)）——
+  //   深色模式下 #FFFAFA 会变成一块亮斑，所以描边与底改成主题 token。
+  //   rgba 那两层光晕保留写死：它是「半透明红」，在深浅两种底上都能看，
+  //   且没法从 token 派生（token 是不透明的 #RRGGBB）
+  .el-form-item.is-error .el-input__inner
+    border-color: var(--theme-font-danger)
+    background-color: var(--theme-bgc-danger)
+    box-shadow: 0 0 0 3px rgba(245, 108, 108, 0.12)
+
+    &:focus
+      border-color: var(--theme-font-danger)
+      box-shadow: 0 0 0 3px rgba(245, 108, 108, 0.18)
+
+  // 报错文案：前面补一个圆形「!」标记，一眼能认出是错误
+  .el-form-item__error
+    display: flex
+    align-items: center
+    // 4px 而不是 6px：整体高度收到 20.8px，配合上面 30px 的字段间距留出净空
+    padding-top: 4px
+    font-size: 12px
+    line-height: 1.4
+    color: var(--theme-font-danger)
+
+    &::before
+      content: '!'
+      display: inline-block
+      flex-shrink: 0
+      width: 14px
+      height: 14px
+      margin-right: 5px
+      border-radius: 50%
+      background-color: var(--theme-font-danger)
+      color: #fff
+      font-size: 10px
+      font-weight: 700
+      line-height: 14px
+      text-align: center
+
+  // el-input 的 clear / suffix 图标位置跟着高度走
+  .el-input__icon
+    line-height: 44px
+
+// ===== ⑥ 切换动效的类（由 AuthModal 的 isRegister 控制）=====
+// 加在 .blog-modal--picSlider 上 → 图片滑到右半边
+.switchPic
+  transform: translateX(var(--modal-panel))
+
+// 加在 .blog-modal--container 上 → 容器归位，露出注册面板
+.switchInput
+  transform: translateX(0px)
+
+// transition 只在「用户点切换按钮」的那一下挂。
+// 对应原项目 myBlog/app/modalControl.js 的 switch()：
+//   $input.addClass('transition')   ← 先挂上过渡
+//   → 切 switchPic / switchInput    ← 这一步才产生动画
+//   → transitionend 时 removeClass('transition')
+// AuthModal 的 switch() / endSwitch() 就是这套流程的 Vue 版。
+//
+// ⚠ 为什么不能让 transition 常驻（之前就写成常驻，是个坑）：
+//   1. 拖动视口跨过 768px 断点时，容器的 transform 会从 translateX(-1×面板宽)
+//      变成移动端的 translate(0) / rotateY(180deg) —— 这是布局变化、不是切换动作，
+//      常驻 transition 会把这次变化也做成 0.5s 动画，表现为「拖视口时表单内容自己在滑」。
+//   2. 快速连点切换时两次过渡会叠加、互相打断（原项目注释里也提到了）。
+// 作用域限定在 .blog-modal--wrap 内，避免和别处的 .transition 撞名。
+.blog-modal--wrap .transition
+  transition: 0.5s
+
+// ===== ⑦ 响应式：≤768px（原项目 media 段）=====
+// 图片滑块隐藏，两块面板改用 3D 翻转切换
+@media screen and (max-width: 768px)
+  .blog-modal--wrap
+    // --modal-panel 的 clamp 下限就是 300px，移动端布局要的正是这个固定值
+    width: var(--modal-panel)
+    // 卡片不再承担底色，改由每个面板自己给（要翻转时背面不能透）
+    background-color: unset
+
+  .blog-modal--picSlider
+    display: none
+
+  .blog-modal--container
+    position: relative
+    width: var(--modal-panel)
+    // 两块面板叠在同一格里（原项目用 position: absolute 叠），
+    // 这样容器高度取两者的**较大值** —— 登录/注册字段数不一样时，
+    // 用 absolute 会让容器只按当前面板算高度，另一块翻过来会被顶部裁掉
+    display: grid
+    grid-template-columns: 1fr
+    transform: translate(0)
+    // 开启 3D，让两块面板能做前后翻面
+    transform-style: preserve-3d
+    z-index: 999
+
+    .blog-modal--element
+      grid-area: 1 / 1 / 2 / 2
+      // 登录/注册两块翻面面板的底：原来写死 #fff，深色下会翻出一块白板
+      background-color: var(--theme-bgc-card)
+      // 背面的面板不显示，否则会透出来
+      backface-visibility: hidden
+
+    // 注册面板先翻到背面
+    .blog-modal--register
+      transform: rotateY(180deg)
+
+  .blog-modal--foot
+    justify-content: center
+
+  // ⚠ 必须写在 .blog-modal--container 之后：两者权重相同，靠书写顺序分胜负
+  .switchInput
+    transform: rotateY(180deg)
+
+// ===== ⑧ 让视口宽度恒定：弹窗开/关时页面不要横移 =====
+// 现象：点登录 → 弹窗出现 → 右侧滚动条消失 → 固定定位的头部
+//       （left: 5% / width: 90%，百分比是按视口算的）**变宽 13.5px、右移 0.75px**，
+//       关掉又缩回来（1440×900 + 15px 滚动条下实测）。
+//
+// 原因：el-dialog 的 lock-scroll（默认开启）会给 body 加 .el-popup-parent--hidden
+//       并隐藏滚动条，于是视口宽出 15px：
+//         · body 里的内容有 element 补的 padding-right: 15px，位置不变 ✓
+//         · 但 position: fixed 的元素（头部、弹窗自己）百分比是按视口算的，
+//           **拿不到这层补偿**，就跟着变了 ✗
+//
+// 修法：让滚动条**槽位**常驻，视口宽度就恒定。两条必须一起加：
+//   ① scrollbar-gutter: stable —— 不管有没有滚动条，右侧都留出槽位。
+//      实测：开关弹窗前头部都是 left 71.25 / width 1282.5 ✓，且**滚动锁定照旧有效**
+//      （弹窗开着时滚轮滚不动背景）。
+//      只加 ①：body 内容会被 element 多补 15px → 左移；
+//      只加 ②：头部继续抽动。
+//   ② 取消 element 那层补偿 padding —— 槽位一直在，不需要补。
+//      它写在 body 的 inline style 上，所以必须用 !important 才压得住。
+//
+// ⚠ scrollbar-gutter 需要 Chrome 94+ / Firefox 97+ / Safari 18.2+；
+//   更旧的浏览器会退回改动前的表现（有位移），不会更糟。
+// ⚠ 副作用：内容不长、本来不需要滚动条的页面上，右侧也会空出 15px 槽位。
+//   本项目页面一直比视口高，视觉上没有差别。
+html
+  scrollbar-gutter: stable
+
+body.el-popup-parent--hidden
+  padding-right: 0 !important
+
+// ============================================================
+// 通用确认弹窗（ConfirmModal.vue）
+//   用来替掉 this.$confirm —— 那个是 MessageBox 的灰白盒子，跟本项目
+//   「主题色头部 + 幽灵/实心按钮」的弹窗语言对不上。
+//   结构沿用 AuthModal 的做法：削平 el-dialog 默认外观，卡片本体自己画。
+//
+// ⚠ 权重：element 的 .el-dialog 是 (0,1,0)，这里一律用
+//   .el-dialog.blog-confirm--dialog（(0,2,0)），与注入顺序无关。
+// ============================================================
+.el-dialog.blog-confirm--dialog
+  border-radius: $theme-radius.md
+  overflow: hidden
+
+  .el-dialog__header
+    padding: 0
+
+  .el-dialog__body
+    padding: 0
+
+.blog-confirm--head
+  display: flex
+  align-items: center
+  justify-content: space-between
+  background-color: var(--theme-bgc-deepBtn)
+  color: var(--theme-font-fst)
+  padding: $theme-spacing.base
+  font-weight: 700
+  font-size: $theme-fz.lg
+
+  .blog-confirm--close
+    display: flex
+    align-items: center
+    justify-content: center
+    flex-shrink: 0
+    width: 30px
+    height: 30px
+    border: none
+    border-radius: 50%
+    // 原来写死 #fff：这圈白色是「压在主题色头栏上的圆钮」，深色下要跟着卡片底走
+    background-color: var(--theme-bgc-card)
+    color: var(--theme-font-fst)
+    cursor: pointer
+    transition: box-shadow 0.2s, transform 0.2s
+
+    i
+      font-size: 14px
+      pointer-events: none
+
+    &:hover
+      box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.2)
+      transform: translateY(-2px)
+
+.blog-confirm--body
+  display: flex
+  align-items: flex-start
+  gap: $theme-spacing.base
+  padding: $theme-spacing.lg $theme-spacing.base
+  font-size: $theme-fz.base
+  color: var(--theme-font-light)
+  line-height: 1.6
+
+.blog-confirm--icon
+  font-size: 22px
+  color: var(--theme-font-fst)
+  // 图标和文字首行对齐（图标是 22px 的字形，文字行高 1.6×16 ≈ 25.6px）
+  margin-top: 2px
+  flex-shrink: 0
+
+.blog-confirm--message
+  margin: 0
+  word-break: break-word
+
+.blog-confirm--foot
+  display: flex
+  justify-content: flex-end
+  align-items: center
+  gap: $theme-spacing.base
+  padding: 0 $theme-spacing.base $theme-spacing.base

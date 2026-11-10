@@ -1,0 +1,291 @@
+@import 'themes.styl'
+
+// ============================================================
+// 「关于」页（时间线展示）样式 —— views/About.vue
+//
+// 需求（Desktop/todo/计划.md 第 61-80 行 + assets 里两张参考图）：
+//   · 滚动条在卡片**内部**，不是整页滚动
+//   · 每个节点：单项背景图 + 年份（大字）+ 月日 + 说明文字，另一侧居中显示标题
+//   · 左右两侧中间有细线；节点左右交替
+//   · 「正在显示」的那个节点不透明、内容区上移让年份一半压在图片上；其余降透明度
+//   · 时间升序（排序在 utils/timelineUtils.js 里做完，模板只负责画）
+//
+// 三档形态由 About.vue 的 isNarrow 切（断点见那边的 NARROW_QUERY）：
+//   .is-narrow 缺席 → 双列（大屏 / ≤991）
+//   .is-narrow 在场 → 单列，线在左侧、标题插进内容区
+//
+// ⚠ 声明统一写「属性: 值」带冒号形式 —— Stylus 对「无冒号 + 值是多段」有歧义，
+//   紧跟缩进更深的嵌套块时会被当成选择器解析、整条静默丢失（详见 component.styl）。
+// ============================================================
+
+// ── 几个联动常量 ─────────────────────────────────────────────
+// 「年份一半压在图片上」那一段位移是**算出来的**，不是试出来的：
+//   位移 = 年份行高的一半 + 内容区上内边距 + 内容区与图片之间的间距
+//   移完之后年份的**中心**正好落在图片下沿 → 视觉上「一半在图上、一半在下方」
+$about-year-fz = 34px
+$about-year-half = 18px        // ≈ $about-year-fz × line-height(1.05) ÷ 2
+$about-content-pad-top = 6px
+$about-content-gap = 14px
+$about-lift = -38px            // = -(18 + 6 + 14)
+
+// 单列形态下中线 / 圆点的横向位置（内容从这条线的右侧开始）
+$about-line-x = 28px
+
+// ============================================================
+// 卡片壳：顶栏贴边（与博客管理 / 个人中心同一套做法）
+// ============================================================
+.el-card.blog-card.blog-about--wrap
+  .el-card__header
+    padding: 0
+  .el-card__body
+    padding: 0
+
+#about
+  // 与 #index / #column / #manage 同款：不锁高，只留底部空白
+  margin-bottom: $theme-spacing['2xl']
+
+// ============================================================
+// 舞台（背景图 + 视口）
+//
+// ⚠ 背景图放在这一层、视口是它的子节点：
+//   背景要在滚动容器**外面**才不会跟着内容滚走（见 About.vue 模板上的说明）。
+// ============================================================
+.blog-about--stage
+  position: relative
+  // 高度：一屏减去「页头 + 页脚 + 卡片顶栏 + 上下留白」的估算值。
+  // ⚠ 340 是实测出来的：目标是「卡片本身接近一屏、外层页面几乎不用滚」，
+  //   同时块内高度又够放下一屏半的节点（单节点 ≈240~300）。
+  //   窗口太矮时由 min-height 兜底，保证至少能看见一个完整节点。
+  height: calc(100vh - 340px)
+  min-height: 460px
+  overflow: hidden
+  // 只圆下面两个角：上面接的是卡片顶栏那条色块
+  border-radius: 0 0 $theme-radius.lg $theme-radius.lg
+  // 没设背景图时的底色（与只读输入框同一档，比卡片底深一点点）
+  background-color: var(--theme-bgc-input)
+
+.blog-about--backdrop
+  position: absolute
+  top: 0
+  left: 0
+  width: 100%
+  height: 100%
+  background-size: cover
+  background-position: center
+  // 纯装饰层，不能挡滚动 / 点击
+  pointer-events: none
+
+// ============================================================
+// 视口：内置滚动条
+// ============================================================
+.blog-about--viewport
+  position: relative
+  height: 100%
+  overflow-y: auto
+  overflow-x: hidden
+  // 细滚动条（Firefox）
+  scrollbar-width: thin
+  scrollbar-color: var(--theme-border-strong) transparent
+
+  &::-webkit-scrollbar
+    width: 8px
+
+  &::-webkit-scrollbar-track
+    background-color: transparent
+
+  &::-webkit-scrollbar-thumb
+    border-radius: 4px
+    background-color: var(--theme-border-strong)
+
+    &:hover
+      background-color: var(--theme-font-trd)
+
+// ============================================================
+// 时间轴
+// ============================================================
+.blog-about--track
+  position: relative
+  padding: 36px 0 52px
+
+  // 中线：贯穿整条时间轴（所以画在 ul 上，而不是每个节点各画一段）
+  // ⚠ 颜色走**主题强调色**而不是 --theme-border-strong：
+  //   这条线是压在用户自己的背景图上的，中性灰在浅色照片上基本看不见（实测），
+  //   跟着主题色走既看得清，也会随调色盘一起变。
+  &::before
+    position: absolute
+    top: 0
+    bottom: 0
+    left: 50%
+    width: 1px
+    content: ''
+    transform: translateX(-50%)
+    background-color: var(--theme-font-fst)
+    opacity: 0.55
+
+// 一个节点：左右两半 + 中线上的圆点
+.blog-about--node
+  position: relative
+  display: flex
+  align-items: center
+  min-height: 240px
+  padding: 0 $theme-spacing.lg
+  // 需求：「非当前正在显示的有透明度」
+  opacity: 0.45
+  transition: opacity 0.5s ease
+
+  // 偶数节点内容在左、奇数在右（模板按 index 打这两条类）
+  &.is-right
+    flex-direction: row-reverse
+
+  // 需求：「正在显示」的那个节点不透明
+  &.is-active
+    opacity: 1
+
+// 主轴那一半（图片 + 内容区）
+.blog-about--main
+  width: 50%
+  // 与中线之间留出距离（左右对称，所以两侧写同一份）
+  padding: 0 40px
+
+// ── 单项背景图 ──────────────────────────────────────────────
+// ⚠ aspect-ratio 必须与 config/timeline.config.js 的 TIMELINE_RATIO.item（3/2）一致：
+//   裁剪按 3:2 做，这里若是别的比例，裁好的构图会被 object-fit 再切一刀
+.blog-about--figure
+  position: relative
+  width: 100%
+  aspect-ratio: 3 / 2
+  border-radius: $theme-radius.md
+  overflow: hidden
+  background-color: var(--theme-bgc-card)
+  box-shadow: $theme-shadows.base
+  // 「进入放大、离开缩小」
+  transition: transform 0.5s ease
+
+  img
+    display: block
+    width: 100%
+    height: 100%
+    object-fit: cover
+
+.blog-about--figure_fallback
+  display: flex
+  align-items: center
+  justify-content: center
+  width: 100%
+  height: 100%
+  color: var(--theme-font-trd)
+  font-size: $theme-spacing.xl
+
+// ── 内容区（年份 / 标题 / 月日 / 说明）────────────────────────
+// 压在背景图上，所以底色走「半透明卡片底」，文字才能在各种图上都读得出来
+.blog-about--content
+  position: relative
+  margin-top: $about-content-gap
+  padding: $about-content-pad-top 18px 16px
+  border-radius: $theme-radius.md
+  transition: transform 0.5s ease
+
+.blog-about--year
+  font-size: $about-year-fz
+  line-height: 1.05
+  font-weight: 700
+  letter-spacing: 1px
+  color: var(--theme-font-fst)
+
+.blog-about--monthday
+  margin-top: 2px
+  font-size: $theme-fz.sm
+  letter-spacing: 1px
+  color: var(--theme-font-fst)
+
+.blog-about--desc
+  margin-top: $theme-spacing.sm
+  font-size: $theme-fz.base
+  line-height: 1.7
+  color: #fff
+
+// 单列形态专有的那一行标题（双列时标题在对侧，不走这里）
+.blog-about--title_inline
+  margin-top: 6px
+  font-size: $theme-fz.base
+  font-weight: 700
+  color: var(--theme-font-fst)
+
+// ── 对侧：标题居中 ──────────────────────────────────────────
+.blog-about--aside
+  display: flex
+  align-items: center
+  justify-content: center
+  width: 50%
+  padding: 0 40px
+
+.blog-about--title
+  font-size: $theme-fz.lg
+  font-weight: 700
+  line-height: 1.6
+  text-align: center
+  color: var(--theme-font-fst)
+  // 它是直接落在背景图上的（没有面板），加一层很轻的投影把字托起来 ——
+  // 比给标题加色块更贴近参考图那种「文字直接在图上」的观感
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45)
+
+// ── 中线上的圆点 ────────────────────────────────────────────
+.blog-about--dot
+  position: absolute
+  top: 50%
+  left: 50%
+  width: 10px
+  height: 10px
+  // 用负 margin 而不是 translate 居中：transform 留给下面那记缩放
+  margin: -5px 0 0 -5px
+  border: 2px solid var(--theme-bgc-veil)
+  border-radius: 50%
+  background-color: var(--theme-font-fst)
+  transition: transform 0.5s ease
+
+// ============================================================
+// 当前节点的几个「上浮 / 放大」
+// ============================================================
+.blog-about--node.is-active
+  .blog-about--figure
+    transform: scale(1.03)
+
+  .blog-about--dot
+    transform: scale(1.5)
+
+  // 需求：内容区向上 transform，使年份一半处于图片上
+  .blog-about--content
+    transform: translateY($about-lift)
+
+// ============================================================
+// 单列形态（992 ~ 1280，由 About.vue 的 isNarrow 切换）
+//
+// 与双列的差别只有三处：
+//   ① 线从正中挪到左侧，节点不再左右交替（所有节点都「线在左、内容在右」）
+//   ② 标题从对侧挪进内容区，插在年份与月日之间
+//   ③ 内容占满整宽（原来一半），所以图片更大、可读性更好
+// ============================================================
+.blog-about--viewport.is-narrow
+  .blog-about--track::before
+    left: $about-line-x
+    transform: none
+
+  .blog-about--node
+    display: flex
+    // 左边给中线留出通道
+    padding: 0 20px 0 64px
+
+    // ⚠ 必须显式抵消双列那句 row-reverse：
+    //   单列下所有节点都是「线在左、内容在右」，不再有左右交替
+    &.is-right
+      flex-direction: row
+
+  .blog-about--main
+    width: 100%
+    padding: 0
+
+  .blog-about--aside
+    display: none
+
+  .blog-about--dot
+    left: $about-line-x
